@@ -1,0 +1,287 @@
+# SAP Table Catalog
+#
+# Classification index for deterministic scope filtering and entity classification.
+# Sensitivity levels: critical, high, medium.
+
+classifications:
+
+  authentication:
+    sensitivity: critical
+    tables:
+      - USR01      # user master runtime
+      - USR02      # logon data (passwords)
+      - USR04      # user authorizations
+      - USR05      # user master parameter IDs
+      - USR06      # additional data per user
+      - USR10      # authorization profiles
+      - USR12      # authorization values
+      - USR21      # user name/address key
+      - USR40      # table of forbidden passwords
+      - USRBF2     # user buffer
+      - USH02      # change history for USR02
+      - USH04      # change history for USR04
+      - USGRP      # user groups
+
+  authorization:
+    sensitivity: critical
+    tables:
+      - AGR_USERS   # role-to-user assignment
+      - AGR_1251    # authorization data for role
+      - AGR_1252    # org levels in role
+      - AGR_DEFINE  # role definition
+      - AGR_FLAGS   # role attributes
+      - AGR_AGRS    # composite roles
+      - AGR_HIER    # role hierarchy
+      - AGR_PROF    # profile name for role
+      - AGR_TEXTS   # role texts
+      - AGR_TCODES  # tcodes in role
+      - AGR_OBJ     # role authorization objects
+      - USKRIA      # critical auth combinations
+      - PRGN_CUST   # role customizing
+      - CD1251      # change doc for authorizations
+
+  code:
+    sensitivity: critical
+    tables:
+      - TRDIR       # program directory
+      - REPOSRC     # program source code
+      - TADIR       # directory of repository objects
+      - DEVACCESS   # developer access table
+      - D010TAB     # table use in programs
+      - D010INC     # include use in programs
+      - TFDIR       # function module directory
+      - ENLFDIR     # additional FM attributes
+      - TRDIRT      # program titles
+      - CROSS       # cross-reference table
+      - WBCROSSGT   # cross-reference web dynpro
+
+  hr_master:
+    sensitivity: critical
+    tables:
+      - PA0000      # actions
+      - PA0001      # org assignment
+      - PA0002      # personal data
+      - PA0003      # payroll status
+      - PA0006      # addresses
+      - PA0008      # basic compensation
+      - PA0009      # bank details
+      - PA0014      # recurring payments
+      - PA0015      # additional payments
+      - PA0105      # communication
+      - PA0185      # ID documents
+      - HRP1000     # org management objects
+      - HRP1001     # org management relationships
+
+  payroll:
+    sensitivity: critical
+    tables:
+      - PCL1        # payroll cluster 1
+      - PCL2        # payroll cluster 2
+      - PC_PAYRESULT # payroll results
+
+  financial_control:
+    sensitivity: high
+    tables:
+      - T001        # company codes
+      - T001B       # permitted posting periods
+      - T003        # document types
+      - T004        # tolerance groups
+      - T005        # countries
+      - T009        # fiscal year variants
+      - T010O       # posting period variants
+      - T012        # house banks
+      - T012K       # house bank accounts
+      - T030        # account determination
+      - TIBAN       # IBAN data
+      - BNKA        # bank master
+
+  financial_master:
+    sensitivity: high
+    tables:
+      - TCURR       # exchange rates
+      - SKA1        # G/L account master (chart of accounts)
+      - SKB1        # G/L account master (company code)
+      - SKAT        # G/L account texts
+      - FAGL_SPLINFO # document splitting info
+
+  financial_document:
+    sensitivity: high
+    tables:
+      - BKPF        # accounting document header
+      - BSEG        # accounting document segment
+      - BSIK        # vendor open items
+      - BSAK        # vendor cleared items
+      - BSID        # customer open items
+      - BSAD        # customer cleared items
+      - BSIS        # G/L open items
+      - BSAS        # G/L cleared items
+      - ACDOCA      # universal journal (S/4HANA)
+      - FAGLFLEXA   # new GL line items
+      - CDHDR       # change document header
+      - CDPOS       # change document position
+      - REGUH       # payment program header
+      - REGUP       # processed items in payment
+      - PAYR        # payment medium
+
+  vendor_master:
+    sensitivity: high
+    tables:
+      - LFA1        # vendor master general
+      - LFB1        # vendor company code
+      - LFBK        # vendor bank details
+      - LFAS        # vendor dunning data
+      - LFBW        # vendor withholding tax
+      - LFM1        # vendor purchasing data
+      - WYT3        # partner functions
+      - ADRC        # addresses (shared)
+      - BUT000      # business partner general (S/4HANA)
+      - BUT020      # business partner addresses (S/4HANA)
+      - BUT021      # business partner address usage (S/4HANA)
+      - BPBK        # business partner bank details (S/4HANA)
+
+  customer_master:
+    sensitivity: high
+    tables:
+      - KNA1        # customer master general
+      - KNB1        # customer company code
+      - KNBK        # customer bank details
+      - KNVV        # customer sales data
+      - KNVP        # customer partner functions
+      - KNVH        # customer hierarchy
+
+  sales_transaction:
+    sensitivity: medium
+    tables:
+      - VBAK        # sales document header
+      - VBAP        # sales document items
+      - VBPA        # sales partners
+      - VBEP        # sales schedule lines
+      - VBUK        # sales doc header status
+      - VBUP        # sales doc item status
+      - VBKD        # sales doc business data
+      - VBFA        # document flow
+      - VBRK        # billing document header
+      - VBRP        # billing document items
+      - KONV        # pricing conditions (document level)
+      - KONH        # pricing condition header
+      - KONP        # pricing condition items
+      - KNKK        # customer credit control
+      - S066        # credit exposure
+      - FPLT        # billing plan dates
+
+  purchasing:
+    sensitivity: high
+    tables:
+      - EKKO        # purchasing document header
+      - EKPO        # purchasing document items
+      - EKET        # scheduling agreement lines
+      - EBAN        # purchase requisitions
+      - EKBE        # purchasing document history
+      - EKPA        # purchasing partner functions
+      - EKKN        # PO account assignment
+
+  material_master:
+    sensitivity: medium
+    tables:
+      - MARA        # general material data
+      - MARC        # plant data for material
+      - MARD        # storage location data
+      - MBEW        # material valuation
+      - EINA        # purchasing info record general
+      - EINE        # purchasing info record purchasing
+      - MVKE        # material sales data
+      - MSEG        # material document segment
+      - MKPF        # material document header
+
+  delivery_document:
+    sensitivity: high
+    tables:
+      - LIKP        # delivery header
+      - LIPS        # delivery item
+      - VEPO        # packing: delivery item to HU
+      - VEKP        # handling unit header
+
+  warehouse_data:
+    sensitivity: high
+    tables:
+      - HUSSTAT     # handling unit status
+      - MCHA        # batch master
+      - MCHB        # batch stock
+      - MCHX        # batch index
+      - DMLAN       # batch classification
+      - DMAKT       # batch description
+      - DMARM       # batch unit of measure
+      - LQUA        # warehouse quants (stock)
+      - LAGP        # storage bins
+      - LTAP        # transfer order items
+
+  shipment_document:
+    sensitivity: high
+    tables:
+      - VTTK        # shipment header
+      - VTTP        # shipment item
+      - VTSP        # shipment stop/stage point
+      - VTTS        # shipment stage
+
+  equipment_master:
+    sensitivity: high
+    tables:
+      - EQUI        # equipment master
+      - EQUZ        # equipment time-dependent data
+
+  rfc_config:
+    sensitivity: critical
+    tables:
+      - RFCDES      # RFC destinations
+      - RFCSYSACL   # RFC system ACL
+      - RFCCHECK    # RFC authority check
+
+  audit_config:
+    sensitivity: critical
+    tables:
+      - RSAU_BUF_DATA  # security audit buffer
+      - RSAUPROF       # audit profiles
+
+  transport:
+    sensitivity: high
+    tables:
+      - E070        # transport request header
+      - E071        # transport object list
+      - E071K       # transport object keys
+      - TPLOG       # transport log
+
+# Pattern-based classification for customer-specific tables.
+custom_pattern_rules:
+  - matches: "ZCUST_PAYROLL*"
+    classification: hr_master
+    sensitivity: critical
+  - matches: "ZHR_*"
+    classification: hr_master
+    sensitivity: critical
+  - matches: "PA9*"
+    classification: hr_master
+    sensitivity: critical
+  - matches: "PCL*"
+    classification: payroll
+    sensitivity: critical
+  - matches: "HRP*"
+    classification: hr_master
+    sensitivity: high
+  - matches: "ZCUST_FIN*"
+    classification: financial_document
+    sensitivity: critical
+  - matches: "ZFI_*"
+    classification: financial_document
+    sensitivity: high
+  - matches: "ZRFC_*"
+    classification: rfc_config
+    sensitivity: critical
+  - matches: "ZMM_*"
+    classification: material_master
+    sensitivity: medium
+  - matches: "ZSD_*"
+    classification: sales_transaction
+    sensitivity: medium
+  - matches: "Z_*"
+    classification: custom_table
+    sensitivity: medium

@@ -1,0 +1,57 @@
+use_case: logistics_fraud
+description: |
+  Detect logistics and warehouse fraud patterns: delivery manipulation,
+  goods issue reversals, inventory theft via transfer orders, shipment
+  diversion/deletion, physical inventory manipulation to conceal theft,
+  equipment misappropriation, and handling unit fraud.
+
+scope_filter:
+  match_any:
+    # Primary categories
+    - operation_category_in:
+        - delivery_outbound
+        - warehouse_management
+        - goods_movement
+        - shipment
+        - quality_management
+        - inventory_management
+        - custom_application_admin
+    # Logistics-related table classifications
+    - entity_classification_in:
+        - delivery_document
+        - warehouse_data
+        - shipment_document
+        - equipment_master
+        - material_master
+    # Cross-classification tables
+    - entity_matches:
+        - "CDHDR"    # change document header
+        - "CDPOS"    # change document position
+        - "VBFA"     # document flow (delivery-to-order chain)
+
+confidence_factors:
+  - sufficient_context
+  - unambiguous_evidence
+  - pattern_clear
+  - scope_unambiguous
+
+severity_hints:
+  critical:
+    - "VL09 (reverse goods issue) followed by MIGO (new goods posting) — revenue manipulation"
+    - "Mass shipment header/item deletion (VTTK/VTTP/VTSP/VTTS DELETE)"
+    - "Equipment master KUNDE field mass-reassignment to single customer"
+    - "Physical inventory count manipulation (MI04/MI07) to conceal theft"
+  high:
+    - "High-volume delivery modifications (VL02N) with quantity/destination changes"
+    - "Transfer order creation (LT03) outside requested scope"
+    - "Handling unit status manipulation (HUSSTAT mass INSERT)"
+    - "Goods movement reversals (MBST) followed by re-postings (MIGO)"
+    - "Custom /MVNT/* or ZMVNT_* admin tcode execution outside scope"
+    - "Goods issue (MB1A) without corresponding delivery"
+    - "Transfer posting (MB1B) between plants without authorization"
+    - "Physical inventory recount (LI12N) overriding original count"
+  medium:
+    - "Delivery item deletions (VEPO DELETE)"
+    - "Inbound delivery modifications (VL32N)"
+    - "Batch data changes (MCHA/MCHB modifications)"
+    - "Material document list (MB51) reconnaissance before manipulation"

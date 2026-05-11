@@ -1,0 +1,73 @@
+use_case: vendor_master_manipulation
+description: |
+  Detect vendor master data fraud: vendor self-dealing (creating fictitious
+  vendors), bank detail manipulation (redirecting payments), vendor
+  duplication, vendor reactivation from blocked status, unauthorized vendor
+  creation during firefighter sessions, dormant vendor reactivation, and
+  vendor-to-payment chains where vendor master changes precede invoice/payment
+  postings.
+
+scope_filter:
+  match_any:
+    # Primary category
+    - operation_category_in:
+        - master_data_modification
+    # Cross-category tcodes relevant to vendor fraud chains
+    - operation_matches:
+        - "FB60"     # vendor invoice (Enjoy) [financial_posting]
+        - "F-43"     # vendor invoice [financial_posting]
+        - "F-53"     # outgoing payment [financial_posting]
+        - "F-58"     # outgoing payment with printout [financial_posting]
+        - "F110"     # automatic payment program [financial_posting]
+        - "MIRO"     # logistics invoice verification [purchasing]
+        - "FBL1N"    # vendor line items [financial_control]
+        - "FK10N"    # vendor balance display [financial_control]
+        - "FBZP"     # payment program configuration [financial_control]
+        - "FI12"     # house bank maintenance [financial_control]
+    # Vendor-related table classifications
+    - entity_classification_in:
+        - vendor_master
+    # Cross-classification tables relevant to vendor fraud
+    - entity_matches:
+        - "BNKA"     # bank master
+        - "TIBAN"    # IBAN data
+        - "T012"     # house banks
+        - "T012K"    # house bank accounts
+        - "REGUH"    # payment program header
+        - "REGUP"    # payment program items
+        - "PAYR"     # payment medium
+        - "BSIK"     # vendor open items
+        - "BSAK"     # vendor cleared items
+        - "CDHDR"    # change document header
+        - "CDPOS"    # change document position
+
+confidence_factors:
+  - sufficient_context
+  - unambiguous_evidence
+  - pattern_clear
+  - scope_unambiguous
+
+severity_hints:
+  critical:
+    - "Self-dealing chain: vendor created (XK01) + bank details set (LFBK) + invoice posted (FB60/MIRO) by same actor in same session"
+    - "Bank detail manipulation: LFBK bank account/routing changed on existing vendor prior to payment run"
+    - "Vendor reactivation: blocked vendor (XK05) unblocked then immediately invoiced"
+    - "House bank manipulation: T012/T012K/TIBAN modified to redirect outgoing payments"
+    - "Payment program data (REGUH/REGUP) manipulated to alter payment recipients"
+  high:
+    - "Vendor bank details (LFBK) modified — BANKN (account number) or BANKL (routing) changed"
+    - "New vendor created (XK01/FK01/MK01) during firefighter session outside requested scope"
+    - "Vendor address (ADRC/LFA1) changed to match actor's known addresses"
+    - "Vendor payment terms changed (LFB1.ZTERM) to accelerate payment"
+    - "Vendor tolerance group changed enabling larger invoice amounts"
+    - "Multiple vendors created with similar bank details (fictitious vendor ring)"
+    - "Vendor purchasing block removed (LFM1) followed by PO creation"
+    - "Dormant vendor reactivation: vendor with no activity for 12+ months suddenly receives invoices"
+    - "Vendor bank detail changed to match another vendor's bank (circular payment)"
+    - "Business partner bank details (BPBK/BUT020) modified in S/4HANA"
+  medium:
+    - "Vendor master viewed (FK10N/FBL1N) as reconnaissance before modification"
+    - "Vendor partner functions (WYT3) modified"
+    - "Vendor dunning data (LFAS) changed"
+    - "Vendor company code data (LFB1) modified outside scope"
+    - "Vendor withholding tax data (LFBW) changed"

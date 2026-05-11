@@ -1,0 +1,72 @@
+use_case: financial_fraud
+description: |
+  Detect financial fraud patterns within a RAK: vendor self-dealing chains,
+  posting period manipulation, GL/master tampering, authorization escalation,
+  code injection enabling fraud, payment manipulation, and duplicate payments.
+
+scope_filter:
+  match_any:
+    # Primary categories
+    - operation_category_in:
+        - financial_posting
+        - financial_control
+        - authorization
+        - code_change
+        - system_config
+    # Cross-category tcodes relevant to financial fraud
+    - operation_matches:
+        - "XK01"     # vendor create [master_data_modification]
+        - "XK02"     # vendor change [master_data_modification]
+        - "FK01"     # vendor create FI [master_data_modification]
+        - "FK02"     # vendor change FI [master_data_modification]
+        - "BP"       # business partner [master_data_modification]
+        - "ME21N"    # PO create [purchasing]
+        - "ME22N"    # PO change [purchasing]
+        - "MIRO"     # logistics invoice [purchasing]
+    # Sensitive table classifications
+    - entity_classification_in:
+        - financial_control
+        - financial_master
+        - financial_document
+        - vendor_master
+        - customer_master
+        - authorization
+        - code
+        - purchasing
+        - rfc_config
+    # Audit class signals
+    - attributes_audit_class_in:
+        - "User Master Change"
+        - "RFC/CPIC Logon"
+
+confidence_factors:
+  - sufficient_context
+  - unambiguous_evidence
+  - pattern_clear
+  - scope_unambiguous
+
+severity_hints:
+  critical:
+    - "Authorization escalation chain (PFCG + SU01 + USR02 modifications)"
+    - "Code injection (SNOTE/SE38 modifying TRDIR/REPOSRC)"
+    - "Self-dealing fraud chain (vendor created + bank changed + invoice posted by same actor)"
+    - "RFC destination manipulation enabling payment redirection"
+    - "External OS command creation (SM69) in production"
+    - "Duplicate payment via FBR2 (post with reference) to same vendor"
+  high:
+    - "Posting period manipulation (OB52 + T001B writes)"
+    - "GL master modifications followed by postings"
+    - "System config tampering (RZ10)"
+    - "Vendor bank detail (LFBK) modified prior to invoice posting"
+    - "Purchase order created/changed with subsequent goods receipt"
+    - "House bank (T012/T012K) or IBAN (TIBAN) modifications"
+    - "Payment program (REGUH/REGUP) data manipulation"
+    - "Tolerance group changes (OBBH) enabling larger postings"
+    - "Payment program config (FBZP) modified before payment run"
+    - "Cash journal posting (FBCJ) outside scope"
+    - "Asset retirement (AB08) — potential asset stripping"
+  medium:
+    - "Master data modifications outside requested scope"
+    - "Sales order value manipulation"
+    - "Document type changes (OBA5)"
+    - "Purchasing info record modifications"

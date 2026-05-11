@@ -1,0 +1,75 @@
+use_case: data_exfiltration
+description: |
+  Detect data theft, mass downloads, sensitive table reads outside the
+  requested FF scope, RFC-based data extraction, debugger abuse,
+  external HTTP access, transport-based exfiltration, custom export-tool
+  usage, and session anomalies.
+
+scope_filter:
+  match_any:
+    # Primary categories
+    - operation_category_in:
+        - data_access
+        - spool_output
+        - background_jobs
+        - debugging
+        - custom_application_admin
+        - suspicious_custom
+    # Cross-category tcodes relevant to exfiltration
+    - operation_matches:
+        - "SM59"     # RFC destinations [system_config]
+        - "SE09"     # transport organizer [code_change]
+        - "SE10"     # transport organizer [code_change]
+        - "SE37"     # function builder / RS_TESTFRAME_CALL [code_change]
+    # Sensitive table classifications (reads = exfil signal)
+    - entity_classification_in:
+        - authentication
+        - authorization
+        - hr_master
+        - payroll
+        - financial_master
+        - vendor_master
+        - customer_master
+        - rfc_config
+        - audit_config
+        - transport
+    # Audit class signals
+    - attributes_audit_class_in:
+        - "Direct Table Access"
+        - "Background Job Utilities"
+        - "RFC/CPIC Logon"
+        - "File Access"
+        - "Spool Output"
+        - "Other"
+    - attributes_log_type_in:
+        - "SM20 LOG"
+
+confidence_factors:
+  - sufficient_context
+  - unambiguous_evidence
+  - pattern_clear
+  - scope_unambiguous
+
+severity_hints:
+  critical:
+    - "RFC_READ_TABLE with high ROWCOUNT (exfiltration chain)"
+    - "SE37 + RS_TESTFRAME_CALL + RFC_READ_TABLE chain"
+    - "Sensitive auth tables (USR02, USR04, AGR_*) accessed"
+    - "Mass row export from sensitive table"
+    - "Custom ZRFC_* programs executed"
+    - "RFC destination created or modified (SM59/RFCDES)"
+    - "External OS command executed (SM69)"
+    - "Transport-based exfiltration: SE09/SE10 creating transport with table contents"
+  high:
+    - "ABAP debugger access in production (Jump to ABAP Debugger)"
+    - "Multiple terminals/IPs for same user within RAK"
+    - "SAPMHTTP or custom HTTP gateway from non-standard terminal"
+    - "Background job targeting HR/payroll tables"
+    - "Custom export programs executed outside scope"
+    - "Spool output for sensitive reports"
+    - "Custom /MVNT/* or ZMVNT_* admin programs"
+    - "File download from application server (CG3Y/AL11)"
+  medium:
+    - "Read-only access outside requested scope"
+    - "Direct Table Access audit class events"
+    - "SE11 data dictionary reconnaissance"

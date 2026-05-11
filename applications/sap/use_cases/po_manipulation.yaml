@@ -1,0 +1,58 @@
+use_case: po_manipulation
+description: |
+  Detect purchase order fraud patterns: PO inflation (quantity/value increases),
+  PO splitting to stay below approval thresholds, PO redirection (changing
+  company code, vendor, or delivery address), unauthorized PO creation,
+  goods receipt without PO, retrospective PO creation, and material-to-PO
+  chains (creating materials specifically to support fraudulent POs).
+
+scope_filter:
+  match_any:
+    # Primary categories
+    - operation_category_in:
+        - purchasing
+        - goods_movement
+    # Cross-category tcodes relevant to PO fraud
+    - operation_matches:
+        - "MM01"     # material create (material-to-PO chain) [master_data_modification]
+        - "MM02"     # material change [master_data_modification]
+    # PO-related table classifications
+    - entity_classification_in:
+        - purchasing
+        - material_master
+    # Cross-classification tables relevant to PO fraud
+    - entity_matches:
+        - "CDHDR"    # change document header (field-level change detection)
+        - "CDPOS"    # change document position
+        - "KONV"     # pricing conditions
+        - "A*"       # condition tables (pricing)
+
+confidence_factors:
+  - sufficient_context
+  - unambiguous_evidence
+  - pattern_clear
+  - scope_unambiguous
+
+severity_hints:
+  critical:
+    - "PO redirection: company code, vendor, or payment terms changed on existing PO"
+    - "Material-to-PO chain: MM01 creates material → ME21N creates PO in same session"
+    - "PO split to circumvent approval: multiple POs just below threshold to same vendor"
+    - "Goods receipt posted (MIGO) for PO with inflated quantities"
+    - "Invoice posted (MIRO) for PO with manipulated values"
+    - "Retrospective PO: PO created (ME21N) after goods receipt (MIGO) already posted"
+  high:
+    - "PO inflation: EKPO quantity (MENGE) or value (NETWR/BRTWR) increased via ME22N"
+    - "PO schedule line quantity (EKET.MENGE) increased beyond original"
+    - "PO account assignment (EKKN) changed post-creation"
+    - "Purchase requisition created and immediately converted to PO"
+    - "PO currency or exchange rate manipulation (EKKO.WAERS/WKURS)"
+    - "Delivery address changed on PO (EKPO.EWERK/WERKS)"
+    - "PO pricing condition manipulation (condition tables)"
+    - "Contract quantity/value exceeded without approval"
+    - "PO release (ME29N) by same actor who created the PO"
+  medium:
+    - "PO created outside requested FF scope"
+    - "Material master created with purchasing views enabled"
+    - "Purchasing info record modified (EINA/EINE)"
+    - "PO displayed (ME23N) as reconnaissance before modification"

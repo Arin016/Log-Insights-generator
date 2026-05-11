@@ -1,0 +1,312 @@
+# SAP Tcode Catalog
+#
+# Classification index for deterministic scope filtering.
+# Categories drive the filter engine; custom_pattern_rules handle Z_*/Y_* tcodes.
+#
+# RULE: Each tcode appears in exactly ONE category (its primary classification).
+# Use cases pull in cross-category tcodes via operation_matches.
+
+categories:
+  data_access:
+    - SE16      # data browser
+    - SE16N     # general table display
+    - SE16T     # table content transport (exfil vector)
+    - SE17      # general table display (old)
+    - SE16H     # HANA-optimized table display (bypasses row limits)
+    - SQVI      # QuickViewer
+    - SQ01      # SAP Query
+    - SQ02      # SAP Query InfoSet
+    - SQ03      # SAP Query user groups
+    - SM30      # table maintenance
+    - SM31      # table maintenance
+    - SE11      # data dictionary
+    - SA38      # program execution
+    - SE84      # repository info system
+    - LSMW      # legacy system migration workbench
+    - ST05      # SQL trace
+    - DB02      # database tables and spaces
+    - SE14      # database utility
+    - SE15      # repository info system
+    - AL11      # SAP directories (file system access)
+    - CG3Y      # download file from application server
+    - CG3Z      # upload file to application server
+    - RSRT      # report execution (export capable)
+
+  master_data_modification:
+    - XK01      # vendor create central
+    - XK02      # vendor change central
+    - XK05      # vendor block/unblock
+    - XD01      # customer create central
+    - XD02      # customer change central
+    - FK01      # vendor create FI
+    - FK02      # vendor change FI
+    - FK05      # vendor block/unblock FI
+    - FD01      # customer create FI
+    - FD02      # customer change FI
+    - FD32      # customer credit management
+    - FS00      # G/L account central
+    - BP        # business partner
+    - MK01      # vendor create purchasing
+    - MK02      # vendor change purchasing
+    - MK05      # vendor block/unblock purchasing
+    - MM01      # material master create
+    - MM02      # material master change
+    - AS01      # asset master create
+    - AS02      # asset master change
+
+  purchasing:
+    - ME21N     # purchase order create
+    - ME22N     # purchase order change
+    - ME23N     # purchase order display
+    - ME28      # release PO collectively
+    - ME29N     # release PO
+    - ME2M      # PO by material
+    - ME2N      # PO by PO number
+    - ME2L      # PO by vendor
+    - ME51N     # purchase requisition create
+    - ME52N     # purchase requisition change
+    - ME54N     # purchase requisition release
+    - ME57      # assign/process purchase requisition
+    - ME11      # purchasing info record create
+    - ME12      # purchasing info record change
+    - ME31K     # contract create
+    - ME32K     # contract change
+    - MIRO      # logistics invoice verification
+    - MR8M      # cancel invoice
+
+  sales:
+    - VA01      # sales order create
+    - VA02      # sales order change
+    - VA03      # sales order display
+    - VA05      # list of sales orders
+    - VA22      # scheduling agreement change
+    - VA32      # scheduling agreement change (outline)
+    - VA41      # contract create
+    - VA42      # contract change
+    - VF01      # billing document create
+    - VF02      # billing document change
+    - VF04      # billing due list
+    - VF11      # billing document cancel
+    - VF21      # credit memo create
+    - VF22      # credit memo change
+    - VK11      # create pricing condition
+    - VK12      # change pricing condition
+    - VKM1      # blocked SD documents (credit)
+    - VKM3      # released SD documents
+
+  financial_posting:
+    - FB01      # post document
+    - FB50      # G/L account document posting
+    - FB02      # change document
+    - FB08      # reverse document
+    - FB60      # vendor invoice (Enjoy)
+    - FB70      # customer invoice (Enjoy)
+    - FBV0      # park document
+    - FBR2      # post with reference (duplicate payment vector)
+    - FBCJ      # cash journal posting
+    - F-02      # G/L account posting
+    - F-22      # customer invoice
+    - F-28      # incoming payment
+    - F-32      # customer clearing
+    - F-43      # vendor invoice
+    - F-44      # vendor clearing
+    - F-48      # vendor payment with clearing
+    - F-51      # post with clearing
+    - F-04      # post with clearing
+    - F-53      # outgoing payment
+    - F-58      # outgoing payment with printout
+    - F110      # automatic payment program
+    - AB01      # asset acquisition
+    - AB08      # asset retirement
+
+  quality_management:
+    - QA02      # change inspection lot
+    - QA11      # record usage decision
+    - QE51N     # record measurement results
+
+  financial_control:
+    - OB52      # open/close posting periods
+    - OB08      # define exchange rates
+    - OBBH      # tolerance groups
+    - OBA5      # document types
+    - OBYA      # cross-company code settings
+    - FBZP      # payment program configuration
+    - FBL1N     # vendor line items
+    - FBL3N     # G/L line items
+    - FBL5N     # customer line items
+    - FAGLL03   # new GL line items
+    - FK10N     # vendor balance display
+    - FS10N     # G/L balance display
+    - FBRA      # reset cleared items
+    - GR55      # report execution
+    - FI12      # house bank maintenance (newer)
+
+  authorization:
+    - PFCG      # role maintenance
+    - SU01      # user maintenance
+    - SU02      # user profiles
+    - SU03      # authorization objects
+    - SU10      # mass user maintenance
+    - SU20      # authorization fields
+    - SU21      # authorization objects maintenance
+    - SU24      # auth object assignment to tcodes
+    - SU25      # upgrade tool for profiles
+    - SU53      # last auth check
+    - SU56      # user buffer analysis
+    - SUIM      # user info system
+    - SUPC      # profiles for composite roles
+    - SM19      # security audit config
+    - SM20      # security audit log
+    - SM21      # system log
+    - RSECADMIN # authorization trace
+
+  code_change:
+    - SE38      # ABAP editor
+    - SE37      # function builder (also exfil vector via RS_TESTFRAME_CALL)
+    - SE80      # object navigator
+    - SE24      # class builder
+    - SE18      # BAdI definition
+    - SE19      # BAdI implementation
+    - SNOTE     # note assistant
+    - SE09      # transport organizer
+    - SE10      # transport organizer
+    - STMS      # transport management system
+    - SMOD      # SAP enhancements
+    - CMOD      # project management enhancements
+    - SE71      # SAPscript form
+    - SE72      # SAPscript styles
+    - SE73      # SAPscript font maintenance
+    - SMARTFORMS # smart forms
+    - SE91      # message maintenance
+    - SE93      # transaction code maintenance
+    - SCI       # code inspector
+
+  system_config:
+    - RZ10      # profile parameter editor
+    - RZ11      # profile parameter values
+    - SCC4      # client administration
+    - SM59      # RFC destinations (critical exfil vector)
+    - SMGW      # gateway monitor
+    - SICF      # ICF service activation
+    - SM69      # external OS commands (critical)
+    - SE06      # set up transport system
+    - SCC1      # client copy
+    - SALE      # ALE/IDoc config
+    - WE20      # partner profiles (IDoc)
+    - WE21      # ports (IDoc)
+    - SCOT      # SAPconnect (email config)
+    - FILE      # logical file paths
+    - STRUST    # trust manager (certificates)
+    - SSM       # secure store management
+
+  background_jobs:
+    - SM36      # define job
+    - SM37      # job overview
+    - SM62      # event management
+    - SM64      # trigger event
+    - SM49      # external commands
+
+  spool_output:
+    - SP01      # spool requests
+    - SP02      # own spool requests
+    - SP1T      # spool admin
+    - SPAD      # spool administration
+
+  debugging:
+    - SE30      # runtime analysis
+    - SAT       # runtime analysis (new)
+    - ST22      # ABAP dump analysis
+    - ST01      # system trace
+    - ST12      # single transaction analysis
+
+  user_monitoring:
+    - AL08      # users logged on
+    - SM04      # user list
+    - STAD      # statistics records
+    - ST03N     # workload analysis
+    - STAUTHTRACE # authorization trace
+
+  delivery_outbound:
+    - VL01N     # create outbound delivery
+    - VL02N     # change outbound delivery
+    - VL03N     # display outbound delivery
+    - VL06O     # outbound delivery monitor
+    - VL09      # reverse goods issue (high-signal)
+    - VL10      # delivery creation from sales orders
+    - VL32N     # change inbound delivery
+
+  warehouse_management:
+    - LT01      # create transfer order manually
+    - LT03      # create transfer order from delivery
+    - LT09      # confirm transfer order (foreground)
+    - LT12      # confirm transfer order
+    - LT15      # confirm transfer order (multiple)
+    - LT21      # display transfer order
+    - LT22      # display transfer orders for material
+    - LS03N     # display storage bin
+    - LS26      # display stock per storage bin
+    - LS33      # display storage type
+    - LI01N     # create physical inventory document
+    - LI02N     # change physical inventory document
+    - LI12N     # physical inventory recount
+    - HUMO      # handling unit monitor
+
+  goods_movement:
+    - MIGO      # goods movement (receipt/issue/transfer)
+    - MB01      # goods receipt for PO
+    - MB1A      # goods issue
+    - MB1B      # transfer posting
+    - MB1C      # other goods movements
+    - MB51      # material document list
+    - MBST      # cancel material document
+    - MB03      # display material document
+
+  shipment:
+    - VT01N     # create shipment
+    - VT02N     # change shipment
+    - VT03N     # display shipment
+    - VTWABU    # shipment completion
+
+  inventory_management:
+    - MI01      # create physical inventory document
+    - MI02      # change physical inventory document
+    - MI04      # enter inventory count
+    - MI07      # post inventory differences
+    - MI09      # enter count with reference
+    - MI10      # create list of differences
+
+# Custom (non-standard) tcodes — pattern-based classification.
+custom_pattern_rules:
+  - matches: "Z_HACK*"
+    category: suspicious_custom
+    risk_level: critical
+  - matches: "ZRFC_*"
+    category: suspicious_custom
+    risk_level: critical
+  - matches: "/MVNT/*"
+    category: custom_application_admin
+    risk_level: high
+  - matches: "ZMVNT_*"
+    category: custom_application_admin
+    risk_level: high
+  - matches: "Y_EXPORT*"
+    category: data_access
+    risk_level: high
+  - matches: "Z_*EXPORT*"
+    category: data_access
+    risk_level: high
+  - matches: "Z_PAY*"
+    category: financial_posting
+    risk_level: high
+  - matches: "Z_AUTH*"
+    category: authorization
+    risk_level: critical
+  - matches: "Z_RFC*"
+    category: system_config
+    risk_level: critical
+  - matches: "Z_*"
+    category: custom_program
+    risk_level: medium
+  - matches: "Y_*"
+    category: custom_program
+    risk_level: medium
