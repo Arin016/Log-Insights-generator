@@ -1,0 +1,607 @@
+{
+  "system_type": "SAP",
+  "description": "SAP challenger context — business workflow awareness, false positive rules, firefighter/EAM context. Used by the challenger phase to verify findings against legitimate SAP business operations.",
+
+  "firefighter_eam_context": {
+    "description": "SAP GRC Emergency Access Management (EAM) / Firefighter sessions are AUTHORIZED elevated access. The user checks out a Firefighter ID (FFID) to perform emergency tasks under heightened logging and approval.",
+    "column_mapping": {
+      "FFID": "The Firefighter ID — an elevated shared account checked out by the user",
+      "FFOWNERNAME": "The actual human user who checked out the firefighter ID",
+      "STATUS": "Approval status — 'Accept' means a controller reviewed and approved the actions, 'Open' means pending review",
+      "COMMENTS": "Controller's approval comments — typically contains reviewer name, date, and justification scope"
+    },
+    "rules": [
+      "If FFID and FFOWNERNAME columns exist, this is a Firefighter/EAM session — the user was AUTHORIZED to use elevated privileges by design",
+      "Do NOT call FFOWNERNAME using FFID 'account hopping' — this is the standard EAM checkout process, not impersonation",
+      "Failed password for the FFID account may be a checkout error, not an intrusion attempt",
+      "If STATUS=Accept for most events, the session was reviewed and approved by a controller — do NOT call it an 'unauthorized attack chain'",
+      "The correct framing for approved sessions with concerning changes is: 'Approved Firefighter Session with Policy Concerns' or 'Scope Creep' or 'Negligent Approval'",
+      "If massive structural changes occurred but logs are ACCEPTED, frame as 'Policy Violation via Rubber-Stamp Approval' or 'Potential Collusion', NOT as a 'hack'",
+      "Firefighter sessions doing 'unusual hours' work is BY DESIGN — emergency access is often needed off-hours when production issues block business operations. Off-hours alone is NOT a finding",
+      "Firefighter IDs are typically named FF_*, FFID_*, or contain 'FIREFIGHT' — these are shared service accounts, not personal accounts. Multiple humans using the same FFID over different days is NORMAL",
+      "Firefighter checkout typically grants TIME-BOUNDED access (a few hours). Long sessions spanning days under one checkout are NOT normal — investigate"
+    ],
+    "scope_creep_detection": "Compare the actual actions against the COMMENTS/ticket justification. If the user was authorized for Basis troubleshooting but modified financial data, that is Scope Creep. If authorized for vendor address fix but changed vendor bank details, that is Scope Creep + payment fraud risk."
+  },
+
+  "false_positive_rules": [
+    {
+      "rule": "Transaction Started ≠ Data Modified",
+      "description": "A 'Transaction X Started' event (SM20 LOG / audit log) does NOT prove data was modified. Only CHANGE LOG entries with Table/Field/Old val/New val (CDPOS records) prove actual changes.",
+      "action": "If a finding claims privilege escalation, data modification, or evidence tampering but evidence only shows 'Transaction Started' — downgrade to reconnaissance/LOW or mark FALSE_POSITIVE."
+    },
+    {
+      "rule": "Failed Reason=2 is a Typo",
+      "description": "Reason=2 means 'Transaction does not exist'. The user typed a wrong tcode (e.g., 'E' instead of Enter, 'ESX' instead of a real tcode). This is NOT privilege testing.",
+      "action": "Downgrade Reason=2 failures to INFO. Only Reason=6 (no authorization) indicates actual access denial."
+    },
+    {
+      "rule": "SPAD/SP01/SP02 Started ≠ Evidence Tampering",
+      "description": "Launching spool administration does not prove spool deletion or data export. Need CHANGE LOG proof.",
+      "action": "Downgrade to LOW reconnaissance unless CHANGE LOG entries show actual spool manipulation."
+    },
+    {
+      "rule": "SU01 Started ≠ Privilege Escalation",
+      "description": "Launching user maintenance does not prove a user was modified. Need CHANGE LOG on USR02/AGR_USERS tables.",
+      "action": "Downgrade to reconnaissance unless CHANGE LOG entries show actual user/role modifications."
+    },
+    {
+      "rule": "SE38 Started ≠ Code Execution",
+      "description": "Launching the ABAP editor does not prove code was executed or modified. Need CHANGE LOG on TRDIR/REPOSRC tables.",
+      "action": "Downgrade to reconnaissance unless CHANGE LOG entries show actual code changes."
+    },
+    {
+      "rule": "Time Gaps Are Normal",
+      "description": "Time gaps in long-running sessions are normal (lunch, meetings, overnight). Do NOT assume time gaps indicate 'unlogged actions' or 'evidence tampering' unless there is direct evidence of audit log manipulation (SM20/SM19 configuration changes).",
+      "action": "Downgrade time-gap findings to INFO unless combined with actual evidence of log manipulation."
+    },
+    {
+      "rule": "Session Duration Alone Is Not a Finding",
+      "description": "Extended session duration is common in SAP, especially for firefighter sessions and Basis troubleshooting that may span days.",
+      "action": "Downgrade to INFO unless combined with actual data modifications."
+    },
+    {
+      "rule": "SE16N with Activity 03 = READ ONLY",
+      "description": "Activity 03 in SAP authorization objects means Display/Read. SE16N with activity 03 is read-only table browsing, not modification. Modification requires &SAP_EDIT user parameter or activity 02.",
+      "action": "Score as reconnaissance/policy deviation, not data manipulation."
+    },
+    {
+      "rule": "Admin Health Checks Are Troubleshooting",
+      "description": "Transactions ST22, SM37, SM21, SM50, SM66, STAD, STAT, SLG1, DB02, DB12, SM12, SM04, AL08, RZ20 are standard troubleshooting tools. They access logs and runtime info but do not modify data.",
+      "action": "Score LOW unless combined with data exfiltration or privilege escalation in the same session."
+    },
+    {
+      "rule": "Synchronous Commits Are Normal — Not Automation",
+      "description": "When a user executes a document-level transaction (FBRA, MR21, MIGO, VL02N, F-03, FB08, FB02, F.13, F-32, F-44 or any transaction that processes multiple line items), the SAP kernel generates one change record per line item per field in a single database commit. A clearing document with 500 line items will produce 1500+ change records (AUGBL+AUGDT+AUGGJ per item) at the exact same timestamp. This is a normal single-button-click SAP save, NOT robotic automation, NOT scripted execution, NOT a bot. However, the UNDERLYING ACTIVITY (e.g., mass clearing reversal, mass goods movement) may still be suspicious — evaluate WHAT was changed and WHY, not HOW FAST the changes appeared.",
+      "action": "NEVER describe high-volume same-timestamp changes as 'automated', 'scripted', 'bot-driven', or 'non-manual' unless the program name in the log is a clearly batch-only program (RFFOEDI*, RSCOLL*, RSBTC*, SAPLBANK_*). Describe them as standard SAP synchronous commits from a single transaction execution."
+    },
+    {
+      "rule": "Duplicate Change Records at Same Timestamp Are Normal",
+      "description": "When a user saves changes to an object with multiple intervals or sub-records (e.g., SNUM/INRIV number ranges, PLPO routing operations, multi-period asset depreciation), the SAP kernel writes one change document entry per interval/sub-record in a single synchronous database commit. Multiple change log lines for the same object at the exact same timestamp is standard SAP behavior, NOT evidence of audit trail corruption.",
+      "action": "Do NOT claim duplicate change records suggest audit trail corruption or log manipulation. Describe them as standard synchronous commits."
+    },
+    {
+      "rule": "GUI Auto-Fetch Is Benign",
+      "description": "Rapid reads of master tables (LFA1, SKB1, MARA, KNA1) immediately after a transaction starts (FB50, ME21N, VA01, FBL5N) are system-populated lookups, not user-initiated reconnaissance. The SAP GUI does these lookups to populate dropdowns and validate inputs.",
+      "action": "Do not flag as suspicious."
+    },
+    {
+      "rule": "Authorized Scope Override",
+      "description": "If a finding flags a data modification as malicious/fraud, BUT the modified table/field semantically aligns with the Session Ticket Justification provided in the context, it is authorized break-fix activity.",
+      "action": "FORCE score to 10/100. The modification aligns with the authorized ticket scope. This is not a finding — it is authorized work. EXCEPTION: financial control fields (ZBD1P, ZTERM, ZLSCH, MWSKZ, EMPFK, LNRZA, BANKL/BANKN/BANKS) and identity/auth tables are NEVER considered in-scope regardless of ticket text."
+    },
+    {
+      "rule": "Display Transactions With Built-In Mass Change Are Standard",
+      "description": "FBL3N (G/L line items), FBL5N (customer line items), FBL1N (vendor line items), and FAGLL03 expose the standard SAP menu path 'Environment → Document → Change' and a 'Mass Change' button (Ctrl+Shift+F9) that calls function module MASS_CHANGE_FI. AR/AP/GL clerks use this DAILY to update payment terms, dunning data, payment methods, text, and assignment fields across hundreds of line items in one save. Generating dozens or hundreds of [U] change records on BSEG/BKPF originating from these transactions is STANDARD SAP behavior — NOT a BAdI exploit, NOT a custom enhancement, NOT 'architecturally impossible'.",
+      "action": "Do NOT describe FBL3N/FBL5N/FBL1N/FAGLL03 changes as 'weaponized BAdI', 'write-enabled exploit', or 'architecturally impossible'. Frame as 'mass change via standard built-in menu'. Evaluate WHICH fields changed and WHETHER the scope is appropriate — not WHETHER changes are possible (they are)."
+    },
+    {
+      "rule": "Side-Effect Header Updates Are Not User Actions",
+      "description": "BKPF.AEDAT, BKPF.UPDDT, MARA.LAEDA, MARC.LAEDA, LFA1.AEDAT, KNA1.AEDAT, USR02.TRDAT all auto-update when related lower-level records change. These are kernel-generated side-effects, not deliberate user modifications.",
+      "action": "Do not count these as separate findings. When listing what a user changed, quote the LINE-LEVEL fields (BSEG.WRBTR, BSEG.ZTERM, etc.) — not the auto-updated header timestamps."
+    },
+    {
+      "rule": "Renaming TOWARD Scrutiny Is Not Concealment",
+      "description": "Real concealment renames objects toward generic catch-all buckets ('Misc', 'Other', 'General Admin'). When an account, cost center, or asset is renamed TOWARD a more-scrutinized board-level category ('Restructuring SG&A', 'Held for Sale', 'Discontinued Operations', 'Strategic Initiatives'), this is the OPPOSITE of fraud — those buckets get more scrutiny, not less, and rename triggers SOX-mandated additional review.",
+      "action": "Do NOT label renames toward scrutinized board-level categories as 'obfuscation' or 'concealment'. These are normal corporate restructuring and reclassification activities."
+    },
+    {
+      "rule": "Asset Reclassification at Project Completion Is Standard",
+      "description": "When a capital project completes, accounting reclassifies the CIP (Construction in Process) balance into the appropriate final asset class — buildings, machinery, equipment, or 'Held for Sale' if the asset is being divested. The asset description rename ('Construction in Process' → 'Fixed Assets - Held for Selling') is the audit trail of the reclassification, not concealment.",
+      "action": "Do not flag CIP-to-Fixed-Asset description changes as 'enabling premature disposal' or 'asset misappropriation' unless paired with IMMEDIATE disposal postings (ABAVN/ABAON) for an asset still actively under construction."
+    },
+    {
+      "rule": "Banking Compliance Mass SWIFT Updates Are Standard",
+      "description": "Global bank mergers, acquisitions, and regulatory ring-fencing (e.g., Barclays BARCGB22 → BUKBGB22 due to UK ring-fencing 2018-2023; SEPA migration; bank rebrandings) require mass SWIFT/BIC updates. These affect ALL records of the same global bank uniformly — they do NOT target specific vendor payments. A fraudster would NOT change BNKA (global bank master) — they would change LFBK (specific vendor's bank routing) via FK02/XK02.",
+      "action": "BNKA SWIFT/BANKL changes that match a known compliance event OR affect all records of the same bank uniformly = LOW risk compliance activity. Only flag as fraud if changes are paired with LFBK changes routing specific vendor payments."
+    },
+    {
+      "rule": "Tax Disabled on Clearing/Suspense/GR-IR Accounts Is Mandatory",
+      "description": "G/L accounts of type 'clearing', 'suspense', 'bank clearing', 'GR/IR', 'transit', or 'intercompany' MUST have tax calculation disabled (MWSKZ='*' wildcard, XMWNO='X' tax-not-required). Bank clearing accounts cannot have automatic tax calculation. This is documented standard SAP FI configuration.",
+      "action": "Check the account name/short text. If it contains 'CLEARING', 'SUSPENSE', 'BANK CLEAR', 'GR/IR', 'TRANSIT', 'INTERCO', 'IC ', or 'Clearing', the MWSKZ='*' / XMWNO='X' configuration is REQUIRED, not 'toxic'. Score INFO. Only flag tax-disable on a P&L expense or revenue account combined with manual journal entries to that account."
+    },
+    {
+      "rule": "FBRA Mass Reversal After F110 Is Standard Cleanup",
+      "description": "FBRA volume that matches a recent (within 48h) F110 payment run's document count is the documented standard remediation for a botched payment run — wrong house bank, wrong payment method, wrong currency rate, wrong posting date, or duplicate run. Procedure is: FBRA mass-reverse the F110 output, fix parameters, re-run F110.",
+      "action": "If FBRA volume ≈ recent F110 volume AND no specific subset of vendors is selectively reversed, mark as 'Post-F110 cleanup — operational fix' at LOW/INFO. Only flag if FBRA targets a SUBSET of a payment run (specific vendors only) without a re-payment, OR if FBRA is followed by manual F-58/F-53 to a different bank account."
+    },
+    {
+      "rule": "Period-End Close Activities Are Calendar-Driven",
+      "description": "Last 3 business days of a month, quarter, or year produce massive volumes of legitimate accounting activity: F.05/FAGL_FC_VAL (foreign currency revaluation), AFAB (asset depreciation), F.13/F-32/F-44 (automatic clearing), GR/IR clearing (MR11), accruals reversal (FB02 on accrual docs), tax provisioning, and FAGL_CL_REGROUP (receivables/payables regrouping). All produce thousands of journal entries, all expected.",
+      "action": "If finding timestamp is within last 3 business days of a fiscal period AND the activity matches period-close patterns (F.05, AFAB, F.13, MR11, FAGL_*, accrual reversals), frame as 'period-end close activity'. Do not characterize as fraud unless changes target specific accounts/vendors atypical for period-end."
+    },
+    {
+      "rule": "Year-End Asset Operations Are Once-A-Year Mass Events",
+      "description": "AJAB (year-end asset closing) and AJRW (asset balance carryforward) are designed to touch every asset in the asset register once per fiscal year. Producing thousands of ANLA/ANLB/ANLC change records in a single AJAB run is exactly what the program does.",
+      "action": "AJAB/AJRW mass changes around fiscal year-end: INFO. Investigate only if executed off-cycle (mid-year) or if specific assets show write-offs to suspicious GL accounts."
+    },
+    {
+      "rule": "Currency Revaluation Generates Many Postings",
+      "description": "F.05 / FAGL_FC_VAL revalues all open items in foreign currencies at month-end exchange rates. Produces one revaluation document per currency per company code per period — but each touches potentially thousands of open items. All entries hit revaluation accounts (typically gain/loss on FX).",
+      "action": "F.05/FAGL_FC_VAL volume at month-end: INFO. Do not claim 'mass financial document modification' — this is automated month-end revaluation."
+    },
+    {
+      "rule": "Cost Center Reorganization Is Routine",
+      "description": "Corporate restructurings, departmental renames, and reorganizations require updating cost center descriptions (CSKT.KTEXT, CSKT.LTEXT) and hierarchy assignments. This is normal HR/finance maintenance, often mass-applied across dozens of cost centers.",
+      "action": "Cost center description/hierarchy mass updates without parallel suspicious financial postings: LOW. Only flag if the rename precedes a sudden surge in journal entries by the same actor to the renamed cost center."
+    },
+    {
+      "rule": "Customer/Vendor Master Extension To New Company Code",
+      "description": "When a vendor or customer is extended to a new company code, SAP generates new LFB1/LFBK/LFBW (or KNB1/KNBK/KNVV) records — appearing as 'inserts' in change records. The LFA1/KNA1 'parent' record is unchanged but its AEDAT updates.",
+      "action": "New LFB1/KNB1 inserts paired with existing LFA1/KNA1 records is master data extension, not vendor/customer creation. Score INFO."
+    },
+    {
+      "rule": "Batch Input Sessions Replay At Machine Speed",
+      "description": "Batch input sessions (recorded via SHDB and processed via SM35) replay user keystrokes at machine speed — generating thousands of changes in seconds. This is the design, not abuse. Common legitimate uses: data migration, mass corrections, system upgrades.",
+      "action": "If session is logged as a batch input session (program SAPMSBI*, RSBDC*, or processed via SM35), describe as 'recorded data load via batch input'. Volume and speed alone are not findings."
+    },
+    {
+      "rule": "Authorization Buffer Issues Cause Spurious Failures",
+      "description": "After role changes, users sometimes hit Reason=7 (auth buffer) failures until SU56/PFUD is run to refresh buffers. These transient failures look like privilege boundary testing but are technical issues.",
+      "action": "Reason=7 (auth buffer) failures: INFO. Reason=6 (actual auth check failed) is the higher-risk signal."
+    },
+    {
+      "rule": "Number Range Buffer Resets Are Standard Maintenance",
+      "description": "When document number ranges run low or buffers desync between application servers, Basis administrators reset INRIV/NRIV via SNUM or SNRO. This produces multiple change records to INRIV at one timestamp — standard maintenance, not fraud.",
+      "action": "INRIV/NRIV updates by Basis users with no other suspicious activity: INFO. Only flag if combined with creation of new document type and immediate posting using the new range."
+    },
+    {
+      "rule": "Empty Audit Log Rows Are NOT Evidence Tampering",
+      "description": "Empty SM20 rows (missing TCODE, PROGNAME, TERMINAL, AUDITCLASS) are common in real SAP logs. Causes include: vendor support sessions via OSS, system bootstrap events, batch programs that don't populate dialog metadata, RFC calls without dialog context, system-initiated events (background processes, IDoc inbound, web service calls without user context), buffer flushes, and log-extraction pipeline truncation. Evidence tampering requires CDPOS modifications on SM19, SM20, RSAU_CONFIG, or DBTABLOG configuration tables — NOT the absence of metadata in some rows.",
+      "action": "Empty-metadata rows alone: INFO at most. Do NOT use words like 'log sanitization', 'synthetic placeholder injection', 'audit log gaps indicating deletion'. Only flag actual SM19/SM20/RSAU_CONFIG/DBTABLOG modifications as evidence tampering."
+    },
+    {
+      "rule": "SA39 Is The Standard Mass G/L Maintenance Tool — Not 'Dangerous'",
+      "description": "SA39 is SAP's documented standard transaction for mass G/L account maintenance — it is the OFFICIAL way to perform bulk SKB1 (company code level) extensions when rolling out a chart of accounts to a new company code or activating accounts in bulk. It is NOT a 'DANGEROUS TOOL', NOT a 'persistence mechanism', and NOT a 'bypass' of FS00 controls — it is a SEPARATE OFFICIAL tool with the same authorization requirements. Same applies to MASS, MM17, BMBC, XK99, XD99, FK99 mass-maintenance transactions.",
+      "action": "Do NOT label SA39/MASS/MM17/BMBC/XK99/XD99/FK99 as 'DANGEROUS TOOL' or 'persistence mechanism'. Frame as 'SAP's standard mass-maintenance transaction'. Speculation about 'saved variants enabling future unattended operations' without evidence of an actual variant being created (CDHDR on VARI/VARID) is NOT a finding."
+    },
+    {
+      "rule": "Hunter Speculation Without Evidence Must Be Removed",
+      "description": "Phrases like 'matches hunting hypothesis pattern of creating parking/suspense accounts', 'classic pattern for redirecting payments to fraudulent vendor accounts', 'enables future unattended mass operations', 'splitting activity to evade detection', 'noise injection', or 'pre-attack reconnaissance' are SPECULATION, not evidence-based findings. They typically come from upstream hypothesis prompts and propagate through the pipeline.",
+      "action": "When rewriting analysis text via corrected_analysis, REMOVE all such speculation. State only what the evidence directly shows. If the evidence shows '13 SKA1 inserts via FS00', say that — do not add 'matches parking account pattern'."
+    },
+    {
+      "rule": "Cross-Session Correlation Requires Direct Evidence",
+      "description": "Stitching multiple challenger-cleared findings into a 'multi-stage fraud chain' or 'campaign' requires evidence of intent connecting them — not just the same actor across sessions. A single user performing G/L config (INFO), bank compliance updates (INFO), CIP reclassification (INFO), FBRA cleanup (INFO), and FBL5N payment-term corrections (LOW) does NOT become CRITICAL when stitched together if each component has a documented benign explanation.",
+      "action": "Do NOT compose 'multi-stage fraud chain' narratives from individually-explained-as-benign findings. The synthesis-level narrative should reflect the AGGREGATE risk level of the components, not invent a higher-level story. Cross-session correlations should be 'temporal' or 'entity_linked' patterns at most — only 'causal' if direct evidence connects them (e.g., a vendor master change followed within minutes by a payment to that vendor by the same user)."
+    },
+
+    {
+      "rule": "Period-End Physical Inventory (MI01-MI10) Is Standard",
+      "description": "Period-end physical inventory cycle (MI01 create → MI04 enter count → MI07/MI08 post differences) produces mass MSEG entries with movement type 711/712/713/714. This is standard accounting reconciliation, not theft.",
+      "action": "MI01-MI10 sequences inside a documented inventory-count window with consistent counted-vs-book deltas: INFO. Only flag if specific assets/materials show unexplained large negative adjustments (BTR_VARIANCE > X% of book) and not paired with a re-receipt."
+    },
+    {
+      "rule": "VL09 Reverse GI Followed by Re-VL02N is Operational Correction",
+      "description": "When a delivery's goods issue was wrong (wrong quantity, wrong batch, wrong storage location), the standard correction is VL09 reverse goods issue + immediate re-pick (LT0A/LT12) + re-VL02N goods issue. This is normal warehouse correction, not silent removal.",
+      "action": "VL09 followed within 30 minutes by VL02N re-post on the same VBELN: INFO. Only flag VL09 patterns that have NO follow-on re-VL02N — those are silent inventory removals."
+    },
+    {
+      "rule": "MIGO 101 / 102 Reversal Pair is Standard Receipt Correction",
+      "description": "Movement type 101 is a goods receipt; 102 reverses it. When a receipt is posted against the wrong PO, wrong material, or wrong quantity, the documented correction is MIGO 102 reversal followed by re-MIGO 101 with correct values. Same fiscal period reversals are routine.",
+      "action": "MIGO 102 reversal of a recent 101 of the same material+plant+quantity within fiscal period: INFO. Flag only when 102 is NOT paired with re-101 OR when the 102 transfers stock to a different valuation class."
+    },
+    {
+      "rule": "LT0A Pick Confirmation With Matching WMENG=VFMNG is Normal",
+      "description": "Transfer order confirmation (LT0A) finalizes a pick. When the confirmed VFMNG matches the planned WMENG, this is standard warehouse execution.",
+      "action": "LT0A entries with WMENG=VFMNG (no quantity divergence): DROP — not a finding. Only flag LT0A with quantity divergence that has no corresponding loss notification or PI count."
+    },
+    {
+      "rule": "Equipment Auto-Status Updates From PM Order are System-Generated",
+      "description": "EQUI/EQUZ status fields auto-update when a PM order (IW32/IW33) is released, technically completed, or business-completed. These are kernel side-effects, not user actions.",
+      "action": "EQUI/EQUZ status changes paired with concurrent IW32 PM order activity by the same user: INFO. Flag only when status changes are user-driven without PM order context (likely IE02 direct edit of equipment ownership/location/scrap status)."
+    },
+    {
+      "rule": "MB1A Reversal of Wrong-Quantity GR Within Same Period is Standard",
+      "description": "When a goods receipt has a wrong quantity, the documented correction is MB1A movement 262 reversing the 261 issue, or MIGO 102 reversing 101. Same fiscal period reversals matched by quantity are operational corrections.",
+      "action": "MB1A 262 / MIGO 102 reversal pairs within same fiscal period and matching original 261/101 quantities: INFO. Flag only when reversal does not match an upstream issue/receipt."
+    },
+    {
+      "rule": "Documented Intercompany Plant-To-Plant Transfer Is Standard",
+      "description": "Movement types 301/303 (plant-to-plant transfers) inside a declared intercompany window for inventory rebalancing are standard supply chain operations.",
+      "action": "301/303 transfers between plants documented in the company's intercompany route master: INFO. Flag only when source/destination plants are unusual for the actor's profile or when transfer is to a low-control destination plant."
+    },
+    {
+      "rule": "Custom Namespace Tcodes Need Manual Review (Not Auto-Suppress)",
+      "description": "Tcodes in customer namespaces (/<NAMESPACE>/<NAME>, e.g. /MVNT/ADMIN, /SAPSII/*, /1BCDWB/*) are vendor- or customer-built. CDPOS for them may be incomplete. The right action is NOT to suppress them as unknown — it's to flag for manual review with descriptive context.",
+      "action": "Custom-namespace tcodes: NEVER mark FALSE_POSITIVE. Score MEDIUM (50) at minimum and label as 'requires manual review of custom transaction'. Reduce only when the tenant's customization registry explicitly registers them as benign."
+    }
+  ],
+
+  "behavioral_baselines": {
+    "human_velocity": "15-45 second gaps between related transactions = standard human interaction",
+    "scripted_automation": "Millisecond/0-second gaps between transactions from non-batch programs = scripted automation",
+    "batch_programs": [
+      "RSCOLL00", "RSBTCDEL", "SAPMSSY1", "RFFOEDI1", "RFFOUS_T", "RFFOAVIS",
+      "SAPMSBI*", "RSBDC*", "RFAUTO*", "SAPF124", "SAPF150", "SAPF111",
+      "RSPO0041", "RSAUEXARC", "RSAU_REORG"
+    ],
+    "data_scraping_threshold": "15+ direct reads of the same table via SE16/SE16N/SE16H in one session",
+    "normal_transaction_burst_size": "1-50 documents from one save = normal user. 100-1000+ at same timestamp from one save = standard mass-update transaction (FBRA, F.13, MASS, MM17, FAGL_FC_VAL, AFAB, AJAB) — not automation"
+  },
+
+  "recovery_context_rules": [
+    "System crisis indicators (ORA errors, DB full, enqueue overflow, system hang, SLG1 errors before action) = EMERGENCY RECOVERY, not a violation",
+    "User created AND deleted in same session with system-open/close bookending = vendor support protocol (SAP OSS access)",
+    "Files moved to backup paths during storage crisis = recovery, not evidence tampering",
+    "Queue entries bulk-updated from error states (SYSFAIL→READY, ERROR→ACTIVE) after recovery = operational fix, even via SE16N &SAP_EDIT",
+    "'E → R' or 'Error → Ready' value changes in recovery context = administrative reset",
+    "Update task entries (SM13) being deleted after a system crash = recovery cleanup",
+    "Lock entries (SM12) being released after a crash = recovery cleanup",
+    "Background jobs being released or rescheduled after a system bounce = standard recovery",
+    "ABAP short dumps (ST22) being analyzed and deleted is normal Basis hygiene"
+  ],
+
+  "materiality_classification": {
+    "class_a_identity_security": "WRITE or EXPORT actions on identity/security tables (USR02, AGR_USERS, AGR_DEFINE, AGR_1251) = CRITICAL. READ-only = flag but lower severity.",
+    "class_b_financial": "WRITE or EXPORT on financial tables (BSEG, BKPF, REGUH, REGUP, ACDOCA) with control-field changes (ZTERM, ZLSCH, EMPFK, payment block) = CRITICAL. READ-only = reconnaissance if not part of violation chain.",
+    "class_b_master_data": "WRITE on master data control fields (LFBK.BANKN/BANKL/SWIFT, LFA1.LNRZA, LFB1.EMPFK/ZAHLS, KNA1, MARA when impacting financial valuation) = HIGH/CRITICAL.",
+    "class_c_logistics": "READ < 1000 rows = MEDIUM (policy deviation). READ > 5000 rows = potential mass exfiltration.",
+    "physical_vs_financial": "Fields BRGEW, NTGEW, VOLUM, GROES, LAENG, BREIT, HOEHE are PHYSICAL metrics (weight/volume/dimensions), NOT currency. Only WRBTR/DMBTR/DMBE2/NETWR/NETPR/BRTWR/EFFWR are currency. Never describe weight/volume changes as 'financial loss'.",
+    "date_insertion": "Changing '00.00.0000' → real date = unauthorized date insertion (potential post-dating fraud), NOT backdating in the legal sense.",
+    "id_field_changes": "AUGBL, BELNR, ADDRNUMBER, IDENTITY_GUID changes are linkage/key updates — describe as such, not as 'credential modification' or 'password change'."
+  },
+
+  "verdict_calibration": {
+    "approved_session_with_concerns": "If STATUS=Accept for most events but concerning changes exist → 'Approved Session with Policy Concerns / Scope Creep'",
+    "rubber_stamp_approval": "If massive structural changes were approved → 'Policy Violation via Negligent Approval' or 'Potential Collusion'",
+    "actual_unauthorized": "If no approval workflow exists or STATUS=Open for critical changes → standard violation assessment applies",
+    "never_call_approved_session_attack": "Do NOT use words like 'sophisticated attack chain', 'coordinated scheme', 'weaponized', 'Hollywood', 'heist', or 'account hopping' for approved firefighter sessions. The vocabulary is for evidence-supported actual attacks, not policy concerns.",
+    "no_change_records_no_critical": "Do NOT issue CRITICAL verdicts when evidence consists only of SM20 'Transaction Started' events. CRITICAL requires CDPOS change records with confirmed Old/New values OR confirmed authorization-denied events on protected objects."
+  },
+
+  "volume_metrics_required": [
+    "Always quantify high-risk tcode usage: 'SE16N was executed N times', 'SM30 was executed N times'",
+    "Report approval status summary: 'X of Y events approved by controller Z'",
+    "Report pending/open items separately",
+    "When reporting mass changes, distinguish: 'X distinct save actions producing Y total change records' (not 'Y modifications')"
+  ],
+
+  "narrative_and_kill_chain_rules": {
+    "description": "Rules for which findings should be included in kill chain and narrative analysis",
+    "rules": [
+      "Findings with risk_score <= 35 or type containing 'info' or 'low' MUST be EXCLUDED from kill chain phases and narrative analysis. They are background noise — include them only in the flat findings list.",
+      "Kill chain phases should only reference findings with risk_score > 35 that show confirmed modifications, confirmed scope violations, or confirmed authorization boundary testing.",
+      "The narrative should tell the story of HIGH-IMPACT actions only. Do not dilute the narrative with read-only browsing, minor policy deviations, or informational observations.",
+      "Banned narrative vocabulary unless evidence explicitly supports it: 'weaponized', 'sophisticated attack chain', 'coordinated scheme', 'Hollywood', 'heist', 'premeditated', 'architecturally impossible', 'evidence tampering' (without SM19/SM20/RSAU_CONFIG changes), 'invisible to monitoring', 'account hopping' (for approved EAM checkout)",
+      "Required framing for firefighter sessions: 'elevated-access activity' or 'Firefighter session' — never 'attack chain'",
+      "Before describing any operation as 'unusual' or 'impossible', check the tcode_behavior_facts in the analysis doc — many SAP transactions have built-in features that look unusual but are documented standard behavior"
+    ]
+  },
+
+  "transport_bypass_detection": {
+    "description": "In PRODUCTION systems, direct data modifications via SE16N, SM30, or SE38 without Transport Requests are severe policy violations even during emergencies",
+    "indicators": [
+      "&SAP_EDIT user parameter set in SE16N/SE16H",
+      "Direct table modification via SE16/SE16N/SE16H without transport",
+      "Code changes via SE38 without transport request",
+      "SM30 modifications on cross-client tables without TR capture",
+      "SE11/SE14 structural changes outside development clients"
+    ]
+  },
+
+  "risk_calibration_matrix": {
+    "failed_attempt_cap": {
+      "rule": "If a transaction resulted in Reason=6 (Auth Denied) or any failed authorization check, the risk score CANNOT exceed 40/100 unless the user persisted with multiple distinct elevated-target attempts. The system defended itself. Treat as reconnaissance/boundary testing.",
+      "max_score": 40
+    },
+    "successful_out_of_scope_floor": {
+      "rule": "If an out-of-scope action resulted in successful data modification (CHANGE LOG with Old/New values) on a system configuration table (INRIV, USR02, AGR_USERS, T001B, TCURR) or master data control field (LFBK.BANKN/BANKL, LFA1.LNRZA, LFB1.EMPFK), the risk score MUST be >= 80/100.",
+      "min_score": 80
+    },
+    "successful_in_scope_cap": {
+      "rule": "If a successful data modification aligns with the ticket justification scope AND the modified field is NOT in the financial_fields_never_in_scope list, the risk score MUST be forced to 10/100. It is authorized break-fix. Exception: financial/cost/vendor control fields are NEVER considered in-scope regardless of table.",
+      "max_score": 10
+    },
+    "read_only_cap": {
+      "rule": "If evidence shows only read-only access (activity 03) with no change records, the risk score CANNOT exceed 40/100 regardless of table sensitivity.",
+      "max_score": 40
+    },
+    "transaction_started_only_cap": {
+      "rule": "If evidence consists only of SM20 'Transaction Started' events with no corresponding CDPOS change records, the risk score CANNOT exceed 30/100. Frame as reconnaissance.",
+      "max_score": 30
+    },
+    "compliance_event_cap": {
+      "rule": "If a finding's pattern matches a known compliance_event_calendar entry (Barclays ring-fencing, SEPA migration, EUR migration, GST/VAT change, IFRS-16 lease transition), the risk score CANNOT exceed 25/100 unless paired with vendor-specific LFBK changes or other targeted financial impact.",
+      "max_score": 25
+    },
+    "period_end_cap": {
+      "rule": "If finding occurs within last 3 business days of a fiscal period AND consists of standard period-close transactions (F.05, FAGL_FC_VAL, AFAB, AJAB, F.13, MR11, FAGL_CL_REGROUP), the risk score CANNOT exceed 30/100.",
+      "max_score": 30
+    },
+    "post_f110_fbra_cap": {
+      "rule": "If FBRA mass-reversal volume matches a recent (within 48h) F110 run's document count AND no subset-targeting is evident (i.e., reversals affect the F110's full output, not just specific vendors), risk score CANNOT exceed 25/100. Frame as post-payment-run cleanup.",
+      "max_score": 25
+    }
+  },
+
+  "financial_fields_never_in_scope": [
+    "FIXKZ", "EBAKZ", "LOEKZ", "FRGKZ", "FRGZU",
+    "VGW01", "VGW02", "VGW03", "VGW04", "VGW05", "VGW06",
+    "VGE01", "VGE02", "VGE03", "VGE04", "VGE05", "VGE06",
+    "ARBID",
+    "LAR01", "LAR02", "LAR03", "LAR04", "LAR05", "LAR06",
+    "WRBTR", "DMBTR", "NETWR", "NETPR", "EFFWR", "BRTWR", "DMBE2", "DMBE3",
+    "LIFNR", "KRED", "BUKRS", "KUNNR",
+    "WAERS", "WKURS", "KURSF", "KURSF_MW",
+    "ZBD1P", "ZBD2P", "ZBD3P", "ZBD1T", "ZBD2T", "ZBD3T", "ZTERM", "ZLSCH",
+    "ZAHLS", "MANSP", "MABER",
+    "MWSKZ", "TXJCD", "XMWNO", "STEUR",
+    "BANKL", "BANKN", "BANKS", "SWIFT", "IBAN", "BNKLZ", "BANK_KEY", "BANK_ACCT",
+    "EMPFK", "LNRZA",
+    "AUGBL", "AUGDT", "AUGGJ"
+  ],
+
+  "tax_disabled_legitimate_account_keywords": [
+    "CLEARING", "CLEAR", "CLRG", "SUSPENSE", "SUSP", "GR/IR", "GRIR", "GR-IR",
+    "TRANSIT", "INTERCO", "INTERCOMPANY", "IC ", "IC-", "BANK CLEAR",
+    "BANK CLG", "PAYROLL CLEAR", "VAT CLEAR", "TAX CLEAR", "CASH CLEAR"
+  ],
+
+  "business_process_patterns": {
+    "description": "Common legitimate SAP business operations that look suspicious but are standard practice. Use these to assess whether a finding has a plausible business justification BEFORE labeling it as fraud or sabotage.",
+    "patterns": [
+      {
+        "pattern": "FBL3N/FBL5N/FBL1N Mass Document Change via Built-In Menu",
+        "what_it_looks_like": "FBL5N (or FBL3N or FBL1N) session generates dozens to hundreds of [U] change records on BSEG/BKPF — typically on ZBD1P/ZBD1T/ZBD2T/ZTERM/ZLSCH/SGTXT/BKTXT fields",
+        "legitimate_explanation": "FBL3N/FBL5N/FBL1N are display reports BUT contain a STANDARD SAP menu path 'Environment → Document → Change' (calls FB02 internally) and a 'Mass Change' button (Ctrl+Shift+F9) that calls function module MASS_CHANGE_FI. AR/AP/GL clerks use this DAILY to update payment terms, dunning data, payment methods, dunning blocks, payment blocks, or text on already-posted documents — after vendor renegotiation, correction of mis-keyed terms, or centralized policy updates. Generating 100+ change records via FBL5N is NOT a BAdI exploit, NOT 'architecturally impossible', NOT custom enhancement. It is a one-click mass-change on filtered line items.",
+        "actual_fraud_indicator": "FBL5N changes targeting a single specific vendor/customer's open invoices changing payment terms to 'immediate' or extending discount %, combined with a payment run executed shortly afterward, especially when the vendor's bank details (LFBK) were also recently modified."
+      },
+      {
+        "pattern": "Mass FBRA Clearing Reversal After Failed F110",
+        "what_it_looks_like": "Thousands of BSEG changes (AUGBL/AUGDT/AUGGJ blanked) across hundreds of line items in seconds, paired with a recent F110 payment run of similar volume",
+        "legitimate_explanation": "FBRA is the STANDARD fix for a botched payment run (F110) or failed bank statement import (FF.5). If IT accidentally posted payments with wrong date, wrong house bank, wrong currency rate, or duplicate run, a superuser MUST bulk reverse them to re-run correctly. Look for: (1) Was F110 run shortly before the FBRA? Yes → confirmed correction. (2) Were the same items re-cleared via subsequent F110 hours later? Yes → confirmed IT fix. (3) Does FBRA volume ≈ F110 volume? Yes → standard cleanup.",
+        "actual_fraud_indicator": "FBRA on a small specific subset of vendor invoices (not thousands of mixed-vendor docs from a payment run), followed by manual payment to a different bank account (F-58/F-53), with NO subsequent re-clearing via F110"
+      },
+      {
+        "pattern": "BNKA Banking Compliance Mass SWIFT Update",
+        "what_it_looks_like": "Multiple Bank Master (BNKA) records updated with new SWIFT/BIC codes — same old → same new across all records of one bank",
+        "legitimate_explanation": "Global bank mergers, acquisitions, and regulatory ring-fencing (e.g., Barclays BARCGB22 to BUKBGB22 due to UK ring-fencing 2018-2023; SEPA migration 2014-2016) require mass SWIFT code updates. These affect ALL records of the same bank uniformly. A fraudster would NOT change the global Bank Master — they would change a specific Vendor's Bank Details (LFBK table via FK02/XK02). If the change is uniform across all records of one bank and matches a known compliance event, this is maintenance, not fraud.",
+        "actual_fraud_indicator": "Changes to LFBK (vendor bank details) routing payments to a new/unknown bank, especially combined with changes to vendor payment terms, alternative payee fields (LFA1.LNRZA, LFB1.EMPFK), or removal of payment block (LFB1.ZAHLS)"
+      },
+      {
+        "pattern": "G/L Account Tax Disabled on Clearing/Suspense/GR-IR Account",
+        "what_it_looks_like": "G/L account (SKA1/SKB1) created or modified with MWSKZ='*' (wildcard tax) and XMWNO='X' (tax not required), often via FS00, SA39, or SM30",
+        "legitimate_explanation": "Clearing accounts, suspense accounts, bank clearing, GR/IR (goods-received/invoice-received), transit, intercompany, payroll clearing, and tax clearing accounts ALL REQUIRE tax to be disabled. You CANNOT have automatic tax calculation on a clearing or suspense account — it would generate spurious tax liabilities. This is documented standard SAP FI configuration. Check the account name/short text for keywords: CLEARING, SUSPENSE, GR/IR, BANK CLEAR, TRANSIT, INTERCO, IC.",
+        "actual_fraud_indicator": "Tax disabled on a P&L expense or revenue account (NOT a clearing/suspense account) combined with manual journal entries (FB01/FB50) posted to that account by the same user who configured it"
+      },
+      {
+        "pattern": "Construction-in-Process (CIP) to Final Asset Class Reclassification",
+        "what_it_looks_like": "ANLA/ANKA changes via AS02 or SKAT.TXT50/TXT20 changes via FS00 moving accounts from 'Construction in Process' / 'CIP' to 'Buildings', 'Machinery', 'Held for Sale', or other final asset classes",
+        "legitimate_explanation": "When a capital project completes, accounting MUST reclassify the CIP balance into the appropriate final asset class. This is a routine quarter-end and year-end procedure performed by Asset Accounting. The rename is the audit trail of the reclassification, not concealment. Project completion documentation is typically in PS module or Investment Management.",
+        "actual_fraud_indicator": "Reclassification of an active, non-completed CIP into 'Held for Sale' immediately followed by manual asset disposal postings (ABAVN/ABAON) for an asset still actively under construction, especially with no project completion documentation"
+      },
+      {
+        "pattern": "Cost Center Description / Hierarchy Reorganization",
+        "what_it_looks_like": "CSKT.KTEXT / CSKT.LTEXT renames or KS02 hierarchy moves, often touching dozens of cost centers in one session",
+        "legitimate_explanation": "Corporate restructurings, departmental renames, M&A integration, and reorganizations require updating cost center descriptions to reflect the new org structure (e.g., 'Marketing' → 'Brand & Demand Generation' or rolling departments under 'Restructuring SG&A' for restructuring-charge accounting under ASC 420). Renaming TOWARD scrutinized board-level categories like 'Restructuring', 'Discontinued Operations', or 'Strategic Initiatives' is the OPPOSITE of obfuscation — those buckets get more scrutiny, not less.",
+        "actual_fraud_indicator": "Cost center renamed to a generic non-scrutinized label (Misc, Other, General Admin), combined with a sudden surge in journal entries (FB50/FB01) routed to that cost center by the same actor who renamed it"
+      },
+      {
+        "pattern": "Cost Center Responsible Person Change",
+        "what_it_looks_like": "CSKS.VERAK (Person Responsible) changed from one name to another via KS02",
+        "legitimate_explanation": "Employee transfers, promotions, departures, and organizational restructuring routinely require updating the responsible person on cost centers. Check if the change aligns with known HR events.",
+        "actual_fraud_indicator": "Responsible person changed to the same user who is making financial postings to that cost center, especially if combined with description changes that obscure the cost center's purpose"
+      },
+      {
+        "pattern": "Mass Payment Term Changes",
+        "what_it_looks_like": "BSEG.ZTERM or BSEG.ZBD1T/ZBD2T/ZBD3T changed across multiple documents",
+        "legitimate_explanation": "Renegotiated vendor contracts, corporate policy changes on payment timing, or corrections to incorrectly applied payment terms. Check if changes are uniform (same old→new across all docs = policy change) vs targeted (specific vendor only = suspicious).",
+        "actual_fraud_indicator": "Payment terms changed to 'immediate payment' on specific vendor invoices just before a payment run, especially if the vendor's bank details were also recently changed, OR a single user both modifying terms and triggering F110"
+      },
+      {
+        "pattern": "Firefighter Session with Mass Changes",
+        "what_it_looks_like": "Single user making hundreds of changes across financial tables in a short time window, often off-hours, under FFID checkout",
+        "legitimate_explanation": "Firefighter (FF_*) IDs exist specifically for emergency access to fix critical production issues. Off-hours execution is common because fixes are scheduled during low-activity windows. The key governance question is NOT whether the changes happened, but whether there is an approved GRC ticket authorizing the session, and whether actions match the ticket scope.",
+        "actual_fraud_indicator": "Firefighter session with STATUS=Open and NO ticket justification (empty COMMENTS), combined with changes that benefit a specific vendor or individual rather than fixing a systemic issue. Or scope creep: ticket authorizes Basis troubleshooting but session modifies vendor bank details."
+      },
+      {
+        "pattern": "BKPF Document Text Changes",
+        "what_it_looks_like": "BKPF.BKTXT or BSEG.SGTXT modified via FB02 or FBL5N→Change",
+        "legitimate_explanation": "Correcting typos, standardizing descriptions, adding reference numbers, or updating text for reporting purposes. BKPF.AEDAT (change date) automatically updates as a side-effect — this is NOT a separate modification.",
+        "actual_fraud_indicator": "Text changed to remove identifying information (vendor name, invoice number) or replaced with generic/misleading descriptions on documents with unusual amounts"
+      },
+      {
+        "pattern": "Cash Discount Field Changes",
+        "what_it_looks_like": "BSEG.SKFBT (cash discount amount), BSEG.SKNTO (cash discount base), or ZBD1P (discount %) modified",
+        "legitimate_explanation": "Corrections to incorrectly calculated discounts, renegotiated terms, adjustments during period-end close, or correction of FBL5N mass-change errors. Check if changes align with vendor communication or contract amendments.",
+        "actual_fraud_indicator": "Discount amounts increased on specific invoices just before payment to favored vendors, with no corresponding vendor agreement"
+      },
+      {
+        "pattern": "Period-End Close Activity Burst",
+        "what_it_looks_like": "Massive volumes of journal entries, currency revaluations, and clearings within last 3 business days of a fiscal period — F.05, FAGL_FC_VAL, AFAB, F.13, MR11, FB02 on accruals, FAGL_CL_REGROUP",
+        "legitimate_explanation": "Last 3 business days of a month, quarter, or year produce massive legitimate accounting activity by design. F.05/FAGL_FC_VAL revalues open items in foreign currency. AFAB runs depreciation. F.13/F-32/F-44 do automatic clearing. MR11 clears GR/IR. Accruals are reversed. All are calendar-driven mass operations producing thousands of postings.",
+        "actual_fraud_indicator": "Period-end activity targeting specific accounts (not blanket runs), or transactions executed by users outside the financial close team, or one-off manual journal entries (FB01/FB50) interleaved with the automated runs that touch unusual accounts"
+      },
+      {
+        "pattern": "Year-End Asset Closing (AJAB / AJRW)",
+        "what_it_looks_like": "Thousands of ANLA/ANLB/ANLC change records during fiscal year-end, all from program AJAB or AJRW",
+        "legitimate_explanation": "AJAB closes the fiscal year for asset accounting; AJRW carries asset balances forward into the new fiscal year. Both touch every active asset by design. Once-a-year mass operations.",
+        "actual_fraud_indicator": "Asset write-offs, impairments, or disposal postings via ABAVN/ABAON during year-end runs targeting specific high-value assets, especially if combined with description changes"
+      },
+      {
+        "pattern": "Foreign Currency Revaluation (F.05 / FAGL_FC_VAL)",
+        "what_it_looks_like": "Mass postings to FX gain/loss accounts at month-end, touching all open items in foreign currencies",
+        "legitimate_explanation": "Standard month-end activity that revalues all open items at the period-end exchange rate. Hits FX revaluation accounts (configured in OB09). Generates one revaluation entry per open item — thousands typical for any multi-currency company.",
+        "actual_fraud_indicator": "Manual FX rate changes (TCURR via OB08) just before F.05 execution by the same user, especially favoring a specific currency exposure"
+      },
+      {
+        "pattern": "Customer/Vendor Master Extension to New Company Code",
+        "what_it_looks_like": "New LFB1/LFBK/LFBW or KNB1/KNBK/KNVV records inserted, with corresponding LFA1/KNA1 record unchanged but AEDAT updated",
+        "legitimate_explanation": "Business expansion, new subsidiaries, or rolling out a vendor to a new buying entity requires extending the master record to additional company codes. The 'parent' (LFA1/KNA1) is reused; only the company-code-specific data is new.",
+        "actual_fraud_indicator": "Extension followed by immediate purchasing or invoicing activity to that new company code by the same user, especially if the vendor is a one-time-vendor (CPD account group)"
+      },
+      {
+        "pattern": "Authorization Buffer Refresh / SU56",
+        "what_it_looks_like": "Mass entries in USR* tables related to user authorization buffer rebuild after PFCG role changes",
+        "legitimate_explanation": "After role modifications, SAP requires authorization buffers to be refreshed (PFUD or SU56) before users can use new authorizations. This produces many auth-related table updates — standard Basis/Security maintenance.",
+        "actual_fraud_indicator": "USR* changes coupled with new role assignments to a user who shortly after performs sensitive actions"
+      },
+      {
+        "pattern": "Number Range Buffer Reset (SNRO / SNUM)",
+        "what_it_looks_like": "Multiple INRIV/NRIV change records at one timestamp, touching multiple intervals",
+        "legitimate_explanation": "When document number ranges run low or buffers desync between application servers, Basis administrators reset them. Multi-interval saves produce multiple change records at one timestamp.",
+        "actual_fraud_indicator": "Number range change creating overlap with existing posted documents, or creating a new range that's then used by FB01 postings to hidden accounts"
+      },
+      {
+        "pattern": "Batch Input Session Replay (SM35)",
+        "what_it_looks_like": "Thousands of changes at machine speed, program name SAPMSBI*, RSBDC*, or session ID indicates batch input",
+        "legitimate_explanation": "Batch input is SAP's standard mass-change replay mechanism. Recordings made via SHDB are replayed via SM35 — at machine speed by design. Common for data migration, mass corrections, year-end adjustments.",
+        "actual_fraud_indicator": "Batch input session that injects new master data records (vendors with bank details) followed by immediate posting/payment to those records — automation-aided fraud"
+      },
+      {
+        "pattern": "Transport Request Import / STMS",
+        "what_it_looks_like": "Mass changes across many tables at once with no individual user actions, TR-driven",
+        "legitimate_explanation": "Transport imports propagate development/config changes from DEV → QA → PRD. They produce broad changes across many tables in seconds. Standard release management.",
+        "actual_fraud_indicator": "TR import that includes table-content changes to financial-control tables (T030, T030K, BNKA) outside a documented release window"
+      },
+      {
+        "pattern": "GR/IR Clearing Run (MR11)",
+        "what_it_looks_like": "Mass clearings of EKBE / open GR/IR items at period-end",
+        "legitimate_explanation": "MR11 clears small GR/IR differences and writes off long-outstanding balances at period-end. Standard month-end activity producing many clearings.",
+        "actual_fraud_indicator": "MR11 with high write-off threshold targeting specific vendor's open items, or run mid-period"
+      },
+      {
+        "pattern": "Recurring Entry Posting (F.14)",
+        "what_it_looks_like": "Many FI documents (doc type X1/X2) posted at month-end with similar amounts and accounts",
+        "legitimate_explanation": "Recurring entries (rent, lease, intercompany allocations) are posted automatically by F.14 from templates. Same-amount, same-account postings to multiple periods is the design.",
+        "actual_fraud_indicator": "New recurring entry template created (FBD1) just before F.14 execution by the same user, posting to unusual accounts"
+      },
+      {
+        "pattern": "Duplicate FBRA in Recovery Window",
+        "what_it_looks_like": "FBRA executed twice on similar document sets within hours",
+        "legitimate_explanation": "When the first re-run of F110 also fails, Basis must FBRA again before retrying. Multiple FBRA + F110 cycles can occur during severe payment-run troubleshooting.",
+        "actual_fraud_indicator": "Repeated FBRA targeting the same specific vendor invoices each cycle without re-payment in between"
+      }
+    ]
+  },
+
+  "fraud_indicators_to_check": {
+    "description": "When evaluating findings, actively look for these ACTUAL fraud indicators instead of flagging standard operations",
+    "indicators": [
+      "LFBK (vendor bank detail) changes via FK02/XK02 — this is where actual payment diversion happens, NOT in BNKA",
+      "One-time vendor payments via F-59 or FB60 using CPD (one-time vendor) accounts",
+      "Alternative payee changes on vendor master (LFA1.LNRZA or LFB1.EMPFK)",
+      "Payment blocks removed (LFB1.ZAHLS) just before a payment run",
+      "Manual F110 payment run targeting specific vendors after master data changes",
+      "FBRA reversal of a SMALL number of specific invoices (not thousands) followed by re-posting to different accounts",
+      "Journal entries (FB01/FB50) to newly created G/L accounts with vague descriptions",
+      "Vendor invoice parking (FV60) followed by immediate posting (FBV0) bypassing approval workflow",
+      "User maintenance (SU01) creating accounts with elevated roles assigned within seconds — bypassing role assignment workflow",
+      "Role assignment (PFCG) granting SAP_ALL or critical Basis profiles to non-Basis users",
+      "RFC destination creation (SM59) pointing to an external IP with credential storage — potential exfiltration channel",
+      "SICF service activation enabling external HTTP access to internal data",
+      "Direct table edits (SE16N &SAP_EDIT) on financial control tables",
+      "ABAP code changes (SE38, SE80) writing to BSEG, USR02, or AGR_USERS in production",
+      "Spool deletion (SP01) of payroll or financial reports immediately after generation",
+      "Audit log configuration changes (SM19/RSAU_CONFIG) reducing logging coverage",
+      "Background job creation (SM36) running as user SAP* or with elevated profile",
+      "Bank account changes on vendor master immediately followed by invoice posting and payment run trigger by same user (Vendor Bank Fraud signature)",
+      "User created and deleted within the same session targeting cleanup of evidence (Ghost User pattern)",
+      "FB02 changes to BSEG.WRBTR — this should not be possible via standard authorization; if observed, indicates F-AT01/F-AT02 misconfiguration or unauthorized custom enhancement",
+      "Mass material price changes (MR21) just before period close inflating inventory valuation",
+      "Withholding tax exemption flags toggled on vendors before payment runs (LFBW.WT_AGENT or LFB1.QSSKZ changes)"
+    ]
+  },
+
+  "hard_positive_signals": {
+    "_doc": "When ANY of these signals is present in a finding's evidence, the challenger MUST NOT downgrade below the listed score floor regardless of other FP rules. These are signals where the SAP system itself has flagged the activity (e.g., Tcode Deviation column = YES) or where the activity is by-definition out-of-policy (developer FFID touching financial data). Suppressing them is a false negative.",
+
+    "tcode_deviation_with_high_tier_change": {
+      "rule": "Audit log column 'Tcode Deviation' = YES AND a CDPOS write occurred on a control_fields_high_risk field",
+      "score_floor": 70,
+      "rationale": "SAP GRC FF system already determined the actual tcode differs from what was approved. Combined with a high-tier-field change, this is a hard policy violation and a documented scope-compliance failure. Note in finding analysis that 'requested_tcode != actual_tcode'."
+    },
+    "tcode_deviation_at_volume": {
+      "rule": "≥50% of session events have Tcode Deviation = YES",
+      "score_floor": 60,
+      "rationale": "When the majority of a firefighter session is OUTSIDE its approved scope, the entire session is presumed to be policy violation. Individual findings inside that session inherit a higher baseline."
+    },
+    "developer_ffid_touching_business_data": {
+      "rule": "FFID name contains DEV / ABAP / TECH / ADMIN / IT / BASIS AND session contains CDPOS writes on financial/master tables (BSEG, BKPF, LFA1, LFBK, KNA1, KNBK, EKPO, EKKO, MARA, AGR_USERS, USR02)",
+      "score_floor": 70,
+      "rationale": "Developer/technical firefighters are scoped for code work and break-fix on dev systems. Use against productive transactional/master data is automatic scope violation regardless of approval status."
+    },
+    "se37_rfc_read_table_extract": {
+      "rule": "SE37 + function module RFC_READ_TABLE / BBP_RFC_READ_TABLE / RFC_GET_TABLE_ENTRIES + ROWCOUNT > 10000 OR target table in {AGR_USERS, AGR_DEFINE, USR02, PA0008, PA0009, BSEG, LFBK, KNBK, PAYR}",
+      "score_floor": 80,
+      "rationale": "Direct bulk extract via function module bypasses tcode-level auth. This is a textbook data-exfil pattern."
+    },
+    "custom_z_program_data_export": {
+      "rule": "SE38/SA38 invocation of Z*/Y* program whose name contains DOWNLOAD / EXPORT / EXTRACT / DUMP, especially when the program references RFC_READ_TABLE or reads sensitive tables",
+      "score_floor": 75,
+      "rationale": "Custom data-export programs in customer namespace are a common exfil vector — they often bypass standard download authority because they call low-level reads."
+    },
+    "po_quantity_or_price_inflation": {
+      "rule": "EKPO.MENGE / EKPO.NETPR / EKPO.NETWR / EKPO.BRTWR / EKET.MENGE [U] where new value is ≥2x the old value, OR currency switched (e.g. EUR→USD), OR absolute increase > 100 units",
+      "score_floor": 75,
+      "rationale": "Procurement quantity/price inflation is a direct fraud lever — over-receipt and over-invoice flow from it."
+    },
+    "ob52_then_backdated_post": {
+      "rule": "OB52 modification of T001B (period control) followed within 24 hours by FB01/FB50/FB02 with BUDAT in the reopened period by the same actor",
+      "score_floor": 85,
+      "rationale": "Posting period reopen for backdating is a textbook period-control bypass."
+    },
+    "rsau_config_then_modify": {
+      "rule": "RSAU_CONFIG / SM19 modification (or DBTABLOG configuration write) followed by financial / privilege / master-data writes by the same actor in the same session",
+      "score_floor": 90,
+      "rationale": "Audit suppression preceding the act is a textbook evidence-tampering pattern."
+    },
+    "phantom_stock_creation_561": {
+      "rule": "MB1C movement 561 (initial stock entry) outside a documented system-load or go-live window — especially by a non-Basis actor",
+      "score_floor": 75,
+      "rationale": "Initial stock entry creates inventory from nothing. It's only valid during go-live/data-loads."
+    },
+    "delivery_then_reverse_GI_no_repost": {
+      "rule": "VL09 reverse goods issue with NO subsequent VL02N re-post on the same VBELN within 30 minutes",
+      "score_floor": 60,
+      "rationale": "Reverse GI without a re-issue means the inventory effectively walks out without a paper trail of where it went."
+    },
+    "transport_bypass_se16n_sap_edit": {
+      "rule": "SE16N invocation with the user parameter &SAP_EDIT enabled in production",
+      "score_floor": 90,
+      "rationale": "&SAP_EDIT toggles SE16N from read to write — direct table edit bypassing transports. This is a critical violation regardless of intent."
+    }
+  },
+
+  "evidence_grading": {
+    "description": "Tiers of evidence quality. Higher confidence findings require higher-tier evidence.",
+    "tier_1_definitive": {
+      "criteria": "CDPOS change records with non-empty Old val and New val on protected fields, attributed to a specific actor at a specific timestamp",
+      "examples": ["BSEG.ZBD1P 1.000 → 0.000", "USR02.UFLAG 0 → 64", "AGR_USERS insert linking user to SAP_ALL"]
+    },
+    "tier_2_strong": {
+      "criteria": "CDPOS change records on configuration tables, OR confirmed authorization-denied (Reason=6) on protected objects",
+      "examples": ["Reason=6 on S_USER_AGR for PFCG", "T030K MWSKZ change", "Multiple Reason=6 across distinct privileged tcodes"]
+    },
+    "tier_3_circumstantial": {
+      "criteria": "SM20 'Transaction Started' on high-risk tcodes, table-level reads via SE16N, sequence/timing patterns",
+      "examples": ["SU01 started but no USR02 changes", "SE16N reads on USR02", "Off-hours session"]
+    },
+    "tier_4_observational": {
+      "criteria": "Volume/timing/duration metrics, behavioral patterns, no direct change evidence",
+      "examples": ["Long session", "Many transactions per minute", "Multiple sessions across days"]
+    },
+    "rule": "CRITICAL verdicts (80+) require Tier 1 or Tier 2 evidence. HIGH (60-80) requires at least Tier 2. Findings supported only by Tier 3-4 evidence cap at MEDIUM (40-60). Tier 4 alone caps at LOW (20-40)."
+  }
+}

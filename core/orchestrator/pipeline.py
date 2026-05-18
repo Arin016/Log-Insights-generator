@@ -4,8 +4,9 @@ Flow:
   1. Scope events per use case (YAML-driven)
   2. Parallel stateful ReAct sessions (one per use case, tools available upfront)
   3. Evidence verification (drop hallucinated event_ids)
-  4. Confidence gate (>= 0.70 → emit, < 0.70 → manual review)
-  5. Persist findings + report
+  4. Challenger — adversarial FP review (false positives → manual review with reason)
+  5. Confidence gate (>= 0.70 → emit, < 0.70 → manual review with reason)
+  6. Persist findings + report
 """
 
 from __future__ import annotations
@@ -114,22 +115,60 @@ def run_pipeline(
         )
         verified_per_use_case[uc] = verified
 
-    # ─── Step 5: Confidence gate ───────────────────────────────────────
-    final_findings_per_use_case: dict[str, list[Finding]] = {}
-    manual_review_count = 0
+    # ─── Step 5: Challenger — adversarial false-positive review ──────
+    from core.challenger import challenge_findings
+
+    challenged_per_use_case: dict[str, list[Finding]] = {}
+    challenger_manual_count = 0
 
     for uc, findings in verified_per_use_case.items():
+        if not findings:
+            challenged_per_use_case[uc] = []
+            continue
+        accepted, manual_items = challenge_findings(findings, rak_id)
+        challenged_per_use_case[uc] = accepted
+        for finding, reason in manual_items:
+            push_to_manual_review(
+                rak_id=rak_id,
+                finding_id=finding.finding_id,
+                pass1_finding=finding,
+                pass2_finding=None,
+                reason=reason,
+            )
+            challenger_manual_count += 1
+
+    # ─── Step 6: Confidence gate ───────────────────────────────────────
+    final_findings_per_use_case: dict[str, list[Finding]] = {}
+    manual_review_count = challenger_manual_count
+
+    for uc, findings in challenged_per_use_case.items():
         emitted: list[Finding] = []
         for f in findings:
             if f.confidence >= CONFIDENCE_THRESHOLD:
                 emitted.append(f)
             else:
+                # Use the LLM's own reasoning + factor-based note
+                factors = f.confidence_factors
+                issues = []
+                if not factors.sufficient_context:
+                    issues.append("insufficient context")
+                if not factors.unambiguous_evidence:
+                    issues.append("ambiguous evidence")
+                if not factors.pattern_clear:
+                    issues.append("borderline pattern")
+                if not factors.scope_unambiguous:
+                    issues.append("unclear scope")
+
+                reason_text = f.reasoning
+                if issues:
+                    reason_text += f" [Flagged: {', '.join(issues)}]"
+
                 push_to_manual_review(
                     rak_id=rak_id,
                     finding_id=f.finding_id,
                     pass1_finding=f,
                     pass2_finding=None,
-                    reason=f"CONFIDENCE_{f.confidence:.2f}_BELOW_{CONFIDENCE_THRESHOLD}",
+                    reason=reason_text,
                 )
                 manual_review_count += 1
         final_findings_per_use_case[uc] = emitted
