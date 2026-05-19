@@ -42,6 +42,9 @@ class Finding(BaseModel):
     affected_session_ids: list[str]
     reasoning: str
 
+    # Business justification (populated by challenger if a legitimate explanation exists)
+    business_justification: str | None = None
+
     # Provenance
     pass_label: Literal["pass_1", "pass_2", "manual_review"] = "pass_1"
     refined_from: str | None = None

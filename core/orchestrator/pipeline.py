@@ -125,7 +125,7 @@ def run_pipeline(
         if not findings:
             challenged_per_use_case[uc] = []
             continue
-        accepted, manual_items = challenge_findings(findings, rak_id)
+        accepted, manual_items = challenge_findings(findings, rak_id, rak_metadata=rak_metadata)
         challenged_per_use_case[uc] = accepted
         for finding, reason in manual_items:
             push_to_manual_review(

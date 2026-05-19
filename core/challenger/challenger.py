@@ -92,11 +92,17 @@ PROMPT_CHALLENGE_BATCH = """You are a senior SAP IGA auditor reviewing findings 
 
 {sap_context}
 
+RAK CONTEXT:
+  Actor: {actor}
+  Requested Scope: {requested_scope}
+  Sessions: {sessions}
+
 REVIEW INSTRUCTIONS:
 1. EVIDENCE GRADING: Tier 1 (CDPOS Old/New) → CRITICAL ok. Tier 3 (SM20 only) → caps at MEDIUM. Tier 4 (volume only) → caps at LOW.
 2. Check EVERY legitimate business pattern. Check built-in tcode behavior.
 3. Firefighter/EAM = authorized elevated access, not an attack.
 4. Apply FALSE POSITIVE RULES and RISK CALIBRATION strictly.
+5. BUSINESS JUSTIFICATION: For each finding, assess whether a legitimate business reason could explain this activity (e.g., urgent PO amendment, bulk delivery processing, period-end corrections, vendor onboarding). If yes, state it clearly.
 
 FINDINGS TO REVIEW:
 {findings_block}
@@ -110,6 +116,7 @@ OUTPUT (JSON only):
     "adjusted_severity": "LOW|MEDIUM|HIGH|CRITICAL",
     "adjusted_confidence": 0.0-1.0,
     "reason": "2-3 sentences explaining decision",
+    "business_justification": "If a legitimate business explanation exists, state it here. Otherwise null.",
     "corrected_title": "new title or null",
     "corrected_reasoning": "rewritten neutral reasoning or null"
   }}
@@ -119,6 +126,7 @@ OUTPUT (JSON only):
 def challenge_findings(
     findings: list[Finding],
     rak_id: str,
+    rak_metadata=None,
 ) -> tuple[list[Finding], list[tuple[Finding, str]]]:
     """Challenge findings in batches.
 
@@ -131,6 +139,9 @@ def challenge_findings(
         return [], []
 
     sap_context = _build_challenger_context()
+    actor = rak_metadata.actor if rak_metadata else "unknown"
+    requested_scope = ", ".join(rak_metadata.requested_operations) if rak_metadata else "unknown"
+    sessions = ", ".join(rak_metadata.session_ids[:5]) if rak_metadata else "unknown"
     accepted: list[Finding] = []
     manual_review: list[tuple[Finding, str]] = []
 
@@ -154,6 +165,9 @@ def challenge_findings(
 
         prompt = PROMPT_CHALLENGE_BATCH.format(
             sap_context=sap_context,
+            actor=actor,
+            requested_scope=requested_scope,
+            sessions=sessions,
             findings_block="\n".join(findings_block_parts),
         )
 
@@ -182,6 +196,8 @@ def challenge_findings(
             reason = r.get("reason", "No reason provided")
 
             if verdict == "CONFIRMED":
+                if r.get("business_justification"):
+                    f.business_justification = r["business_justification"]
                 accepted.append(f)
                 log.info("challenger.confirmed", finding_id=f.finding_id)
 
@@ -195,6 +211,8 @@ def challenge_findings(
                     f.title = r["corrected_title"]
                 if r.get("corrected_reasoning"):
                     f.reasoning = r["corrected_reasoning"]
+                if r.get("business_justification"):
+                    f.business_justification = r["business_justification"]
                 accepted.append(f)
                 log.info("challenger.adjusted", finding_id=f.finding_id,
                          severity=f.severity, reason=reason)

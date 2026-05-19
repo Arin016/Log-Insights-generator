@@ -149,6 +149,11 @@ header h1 { font-size: 1.5rem; color: #fff; margin-bottom: 8px; }
     </div>
     <div class="finding-title">{{ f.title }}</div>
     <div class="finding-reasoning">{{ f.reasoning }}</div>
+    {% if f.business_justification %}
+    <div style="background:#1a2a1a;border:1px solid #2d5a2d;border-radius:6px;padding:10px 14px;margin:10px 0;font-size:0.85rem;color:#8fbc8f;">
+      <strong style="color:#6fbf6f;">Business Justification:</strong> {{ f.business_justification }}
+    </div>
+    {% endif %}
     <div class="evidence-toggle" onclick="toggleEvidence(this)">▶ Evidence ({{ f.evidence_event_ids|length }} events)</div>
     <div class="evidence-list">
       <table class="log-table">
