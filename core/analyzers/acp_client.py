@@ -23,11 +23,12 @@ import time
 from typing import Any
 
 from config import KIRO_BINARY, KIRO_MODEL, PROJECT_ROOT
+from core.analyzers.base import LLMBackend, LLMResponse
 from core.logging_setup import log
 from core.persistence.local_store import log_llm_call
 
 
-class KiroAcpSession:
+class KiroAcpSession(LLMBackend):
     """A stateful ACP session wrapping a long-running kiro-cli acp subprocess."""
 
     def __init__(self, rak_id: str, use_case: str, model: str | None = None):
@@ -70,10 +71,20 @@ class KiroAcpSession:
     def __exit__(self, *_):
         self.close()
 
+    # ─── LLMBackend properties ──────────────────────────────────────────
+
+    @property
+    def supports_native_tool_use(self) -> bool:
+        return False
+
+    @property
+    def supports_checkpointing(self) -> bool:
+        return False
+
     # ─── Public API ─────────────────────────────────────────────────────
 
-    def send_message(self, content: str, *, purpose: str = "", timeout: float = 60) -> str:
-        """Send a message and return the full assistant response text."""
+    def send_message(self, content: str, *, purpose: str = "", timeout: float = 60) -> LLMResponse:
+        """Send a message and return the full assistant response."""
         start = time.time()
         request_id = self._next_id()
 
@@ -102,7 +113,7 @@ class KiroAcpSession:
 
         log.info("acp.turn_complete", rak_id=self.rak_id, use_case=self.use_case,
                  latency_ms=latency_ms, response_len=len(response_text))
-        return response_text
+        return LLMResponse(text=response_text)
 
     # ─── Internal Protocol ──────────────────────────────────────────────
 
