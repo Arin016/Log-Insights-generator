@@ -1,0 +1,883 @@
+{
+  "system_type": "SAP",
+  "description": "SAP ERP audit log analysis context for the analysis (hunt) phase. Used by the LLM to identify suspicious patterns in SAP logs.",
+
+  "log_type_mapping": {
+    "audit_log": "SM20 LOG",
+    "change_record": "CHANGE LOG",
+    "description": "SM20 LOG = transaction started/table accessed (audit trail). CHANGE LOG = actual data modification with old/new values written via SAP's Change Document framework (CDHDR/CDPOS tables). Only CHANGE LOG entries with Old/New values prove actual data was modified. SM20 'Transaction Started' alone proves only that the user opened the transaction screen — not that they saved anything."
+  },
+
+  "change_document_framework": {
+    "description": "SAP records data changes through the CDHDR/CDPOS framework. Every business object that supports change tracking has a 'Change Document Object' name (different from its table name). Understanding these names is essential for evaluating change records.",
+    "object_to_table_mapping": {
+      "DEBI": "Customer master (KNA1, KNB1, KNVV)",
+      "KRED": "Vendor master (LFA1, LFB1, LFM1)",
+      "KONTO": "G/L account master (SKA1, SKB1, SKAT)",
+      "BELEG": "Accounting document (BKPF, BSEG)",
+      "MATERIAL": "Material master (MARA, MARC, MARD)",
+      "BANK": "Bank master (BNKA)",
+      "KOSTL": "Cost center (CSKS, CSKT)",
+      "PRCTR": "Profit center (CEPC, CEPCT)",
+      "ANLA": "Asset master (ANLA, ANLB, ANLZ)",
+      "EINKBELEG": "Purchasing document (EKKO, EKPO)",
+      "VERKBELEG": "Sales document (VBAK, VBAP)",
+      "USER": "User master (USR02, USR21)",
+      "PFCG_ROLE": "Authorization role (AGR_DEFINE, AGR_1251)",
+      "BANK_ACCT": "House bank account (T012, T012K)",
+      "RANGE": "Number range interval (NRIV, INRIV)"
+    },
+    "change_indicators": {
+      "I": "Insert — new record created",
+      "U": "Update — existing field changed (will have Old val and New val)",
+      "D": "Delete — record deleted",
+      "E": "Single field deletion within a record",
+      "J": "Header insert (often paired with I records for line items)"
+    },
+    "auto_update_side_effects": [
+      "BKPF.AEDAT and BKPF.UPDDT are automatically updated by the SAP kernel whenever any line item (BSEG) of a document is modified — these are NOT separate user actions",
+      "MARA.LAEDA / MARC.LAEDA auto-updates when material master fields change in any view",
+      "LFA1.ERDAT/AEDAT and KNA1.ERDAT/AEDAT auto-update when any sub-table (LFB1, LFBK, KNB1, KNVV) is modified",
+      "USR02.TRDAT (last login date) auto-updates on every login — this is not a security event",
+      "AGR_USERS.FROM_DAT/TO_DAT auto-update when role validity is recalculated, even without explicit user action"
+    ]
+  },
+
+  "transaction_risk_vectors": {
+    "SYSTEM_MAINTENANCE": [
+      "SNOTE", "SPAU", "SPAU_ENH", "SPDD", "SCC4", "SCC1", "SCC9", "SE14", "SGEN",
+      "ST22", "SM50", "SM21", "SM37", "SM35", "SP01", "SP02", "AL08", "AL11",
+      "RZ04", "RZ10", "RZ11", "RZ12", "RZ20", "RZ21", "RZ70", "DB01", "DB02",
+      "DB13", "DB14", "DB17", "ST02", "ST03", "ST04", "ST05", "ST06", "STAD",
+      "STAT", "SLG1", "SLG2", "SM12", "SM13", "SM14", "SM58", "SM65", "SM66"
+    ],
+    "PERSISTENCE_BACKDOOR": [
+      "SU01", "SU01D", "SU10", "SU3", "SU53", "SU56", "PFCG", "PFUD", "OOSB",
+      "OOSP", "SM59", "SICF", "SICF_SESSIONS", "STRUST", "STRUSTSSO2", "SUIM",
+      "SU24", "SU25", "SU22", "PFCG_TIME_DEPENDENCY", "SE92", "SLDAPMAP", "SLDAP"
+    ],
+    "DATA_EXFIL_RECON": [
+      "SE16", "SE16N", "SE16H", "SE17", "SE11", "SE12", "SE13", "SQVI", "SQ01",
+      "SQ02", "SQ03", "DB02", "DB50", "ST05", "ST10", "CG3Y", "CG3Z", "AL11",
+      "DBACOCKPIT", "RSRT", "RSA1", "LISTCUBE", "SE36", "SE37", "MASS",
+      "SLIN", "WE19", "BD87", "WE02", "WE05"
+    ],
+    "EXECUTION_EXPLOIT": [
+      "SE38", "SA38", "SE80", "SE37", "SE24", "SE19", "SE18", "SE93", "SM49",
+      "SM69", "SXDA", "ABAPDOCU", "ABAP_DOCU", "SE39", "SE71", "SE73", "SHDB",
+      "SCAT", "ECATT", "SECATT", "SE43", "SE43N", "SE41"
+    ],
+    "LOG_TAMPERING": [
+      "SM19", "SM20", "SM20N", "STAD", "STAT", "SLG1", "SLG2", "ST01", "ST05",
+      "RSAU_CONFIG", "RSAU_ADMIN", "RSAU_SELECT_EVENTS", "SAUDIT", "SCU3",
+      "SP01", "SP02", "SP12", "SCC4"
+    ],
+    "FINANCIAL_SKEW": [
+      "FB01", "FB01L", "F-02", "F-03", "F-04", "F-05", "F-06", "F-07", "F-30",
+      "F-32", "F-39", "F-43", "F-44", "F-51", "F-53", "F-58", "F-59", "FB05",
+      "FB07", "FB08", "FB09", "FB60", "FB65", "FB70", "FB75", "FBV0", "FV60",
+      "FV65", "FV70", "FV75", "FBR2", "FBRA", "MIRO", "MIR4", "MIR6", "MIR7",
+      "MIGO", "MB1A", "MB1B", "MB1C", "MB31", "FS00", "FSP0", "FSS0", "OBR1",
+      "OBR2", "OBR3", "FB02", "FBL1N", "FBL3N", "FBL5N", "FBCJ", "FBV2",
+      "ME21N", "ME22N", "ME52N", "ME9F", "VA01", "VA02", "VA42", "VA45",
+      "BP", "XD01", "XD02", "XK01", "XK02", "FK01", "FK02", "FD32", "MASS",
+      "F110", "F111", "F-44", "F-32", "FCH5", "FCH7", "FCH8", "FCH9", "FCHD",
+      "FCHE", "FCHF", "FCHG", "FCHI", "FCHN", "FCHR", "FCHT", "FCHU", "FCHV",
+      "FCHX", "F.13", "F.14", "F.19", "F.05", "FAGL_FC_VAL", "FAGL_CL_REGROUP"
+    ],
+    "ASSET_ACCOUNTING": [
+      "AS01", "AS02", "AS03", "AS11", "AS21", "AS22", "AS23", "AS25", "AS91",
+      "AS92", "AS93", "ABAVN", "ABAON", "ABAA", "ABAW", "ABGL", "ABGF", "ABMR",
+      "ABNAN", "ABNK", "ABSO", "ABST", "ABT1N", "ABUMN", "ABZON", "ABZE", "ABZP",
+      "AFAB", "AFAR", "AFBN", "AJAB", "AJRW", "AR01", "AR05", "AR11", "OAOB",
+      "AIBU", "AIAB", "AIST", "F-90", "F-91", "F-92"
+    ],
+    "COST_CONTROLLING": [
+      "KS01", "KS02", "KS03", "KSU1", "KSU2", "KSU3", "KSU5", "KSV1", "KSV2",
+      "KSV3", "KSV5", "KB11", "KB11N", "KB13", "KB13N", "KB14", "KB14N", "KB15",
+      "KB15N", "KB16", "KB16N", "KB21", "KB21N", "KSII", "KSU5", "KSV5", "KP06",
+      "KP26", "KKAO", "KKAY", "CO88", "KO88", "KSWB", "KSB1", "KSB5", "KSBP"
+    ],
+    "TREASURY_BANKING": [
+      "FF.5", "FF67", "FF68", "FF.4", "FF.6", "FF.D", "FEBA", "FEBA_BANK_STATEMENT",
+      "FEBC", "FEBP", "FF_5", "FF_6", "FBME", "FBZP", "FCHI", "FI01", "FI02",
+      "FI03", "FI12", "FI12_HBANK", "OB10", "OBVCU", "FQUR", "OB08", "OB22",
+      "F.05", "FAGL_FC_VAL", "FAGL_FCV"
+    ],
+    "HR_PAYROLL": [
+      "PA10", "PA20", "PA30", "PA40", "PA41", "PA42", "PA62", "PA63", "PA64",
+      "PA70", "PA71", "PA03", "PA04", "PA05", "PA06", "PA08", "PA09", "PAUX",
+      "PUOC_99", "PC00_M99_CIPC", "PC00", "PE01", "PE02", "PE03", "PE04",
+      "PU01", "PU03", "PU12", "PU19", "PU22", "PT01", "PT02", "PT_BPC10",
+      "HRBEN0001", "HRBEN0083", "PRAA", "PRRW", "PRFI", "PRDC"
+    ],
+    "CONFIG_MODS": [
+      "SM01", "SM30", "SM31", "SM34", "OB52", "OB53", "OB58", "OB62", "OB72",
+      "OB08", "OB22", "OB28", "OB29", "OB37", "OB38", "OB40", "OB41", "OB45",
+      "OB67", "OBA1", "OBA2", "OBA3", "OBA4", "OBA5", "OBYC", "OBY6", "OBY9",
+      "OBYA", "OKKP", "OKB9", "OKEN", "OKEON", "OKEQ", "OKKS", "OKEP",
+      "RZ10", "RZ11", "STMS", "STMS_IMPORT", "SE09", "SE10", "SE03"
+    ],
+    "API_WEB_GATEWAY": [
+      "/IWBEP/REG_SERVICE", "/IWFND/MAINT_SERVICE", "/IWFND/GW_CLIENT", "SICF",
+      "SMICM", "SOAMANAGER", "SRT_UTIL", "SRTUTIL", "WSADMIN", "WSCONFIG",
+      "SMQ1", "SMQ2", "SMQR", "SMQS", "SMQE", "SCC4", "STRUSTSSO2"
+    ],
+    "MASS_PROCESSING": [
+      "MASS", "MASSD", "XK99", "XD99", "MM17", "BMBC", "MEMASSPO", "MEMASSRQ",
+      "MEMASSIN", "VA02_MASS", "VA42_MASS", "FK99", "FD99", "F.5D", "OB_GLACC",
+      "OB_GLACC11", "MB52", "MB59"
+    ],
+    "NUMBER_RANGE_CONFIG": [
+      "SNUM", "SNRO", "SNR0", "OYSN", "FBN1", "FBN2", "OPK7", "OPN1", "OMH6"
+    ],
+    "TRANSPORT_MANAGEMENT": [
+      "STMS", "SE01", "SE03", "SE09", "SE10", "STMS_IMPORT", "STMS_QA", "STMS_QUEUE",
+      "SCC1", "SCMP", "SCU0", "SCWB", "SE95"
+    ],
+    "BATCH_INPUT_RECORDING": [
+      "SHDB", "SM35", "SM35P", "SCAT", "ECATT", "SECATT", "STWB_2", "SCMA"
+    ],
+    "LOGISTICS_DELIVERY": [
+      "VL01", "VL01N", "VL01NO", "VL02", "VL02N", "VL03", "VL03N", "VL04", "VL06",
+      "VL09", "VL10A", "VL10B", "VL10D", "VL31N", "VL32N", "VL33N", "VL06O"
+    ],
+    "LOGISTICS_TRANSFER_ORDER": [
+      "LT01", "LT02", "LT03", "LT04", "LT05", "LT06", "LT09", "LT0A", "LT0K",
+      "LT11", "LT12", "LT15", "LT16", "LT21", "LT22", "LT26", "LU04"
+    ],
+    "LOGISTICS_HANDLING_UNIT": [
+      "HU02", "HU03", "HUMO", "VHUE", "VHUF", "VEKP", "VEPO", "HUPAST", "HU01"
+    ],
+    "LOGISTICS_SHIPMENT": [
+      "VT01", "VT01N", "VT02", "VT02N", "VT03", "VT03N", "VT11", "VT12", "VT22",
+      "VT70", "VTWABU"
+    ],
+    "LOGISTICS_GOODS_MOVEMENT": [
+      "MIGO", "MIGO_GR", "MIGO_GO", "MIGO_TR", "MB01", "MB02", "MB03", "MB04",
+      "MB05", "MB1A", "MB1B", "MB1C", "MB11", "MB31", "MB51", "MB52", "MB59",
+      "MBST", "MR8M", "ML81N", "MIRO_REV"
+    ],
+    "LOGISTICS_PHYSICAL_INVENTORY": [
+      "MI01", "MI02", "MI03", "MI04", "MI05", "MI07", "MI08", "MI09", "MI10",
+      "MI11", "MI20", "MI21", "MI22"
+    ],
+    "LOGISTICS_EQUIPMENT": [
+      "IE01", "IE02", "IE03", "IE05", "IE07", "IE08", "IE4N", "IH01", "IH02",
+      "IL01", "IL02"
+    ],
+    "LOGISTICS_BATCH": [
+      "MSC1N", "MSC2N", "MSC3N", "MSC4N", "MB1B", "BMBC", "MM02"
+    ]
+  },
+
+  "sensitive_tables": {
+    "CONFIG_CRITICAL": [
+      "T000", "T001", "T001B", "T001K", "T001L", "T003", "T004", "T005",
+      "TCURR", "TCURT", "TCURX", "T030", "T030B", "T030H", "T030K", "T030R",
+      "T030U", "OB52", "TSTC", "TSTCT", "TSTCP", "INRIV", "NRIV", "TBSL",
+      "T100", "T100C", "T100T"
+    ],
+    "ROLE_AUTH": [
+      "AGR_DEFINE", "AGR_1251", "AGR_1252", "AGR_USERS", "AGR_FLAGS", "AGR_TCODES",
+      "AGR_PROF", "AGR_AGRS", "AGR_HIER", "AGR_HIERT", "UST04", "UST10C", "UST10S",
+      "UST12", "USOBT", "USOBT_C", "USOBX", "USOBX_C", "USKRIA", "TOBJ"
+    ],
+    "VENDOR_MASTER": [
+      "LFA1", "LFB1", "LFB5", "LFBK", "LFBW", "LFM1", "LFM2", "WYT3", "ADRC",
+      "ADR2", "ADR3", "ADR6", "ADRT", "KLPA", "WYT1", "WYT1T"
+    ],
+    "CUSTOMER_MASTER": [
+      "KNA1", "KNB1", "KNB5", "KNBK", "KNBW", "KNVV", "KNVI", "KNVK", "KNVL",
+      "KNVP", "KNVD", "KNKK", "ADRC", "ADR6"
+    ],
+    "GL_MASTER": [
+      "SKA1", "SKB1", "SKAT", "CSKAB", "MAHNS", "MAHNV", "T077S", "T077X"
+    ],
+    "USER_MASTER": [
+      "USR01", "USR02", "USR04", "USR05", "USR06", "USR07", "USR08", "USR09",
+      "USR10", "USR11", "USR12", "USR13", "USR14", "USR21", "USR22", "USR40",
+      "USR41", "USRBF2", "USREFUS", "USGRP", "USGRPT", "USRACL", "USERS_SSF"
+    ],
+    "DEVELOPER": [
+      "DEVACCESS", "TDEVC", "TDEVCT", "TADIR", "TRDIR", "TFDIR", "REPOSRC",
+      "REPOTEXT", "D010S", "D010Q", "DOKHL", "DOKIL", "DOKTL", "ABAPTEXT"
+    ],
+    "FI_DOCS": [
+      "BKPF", "BSEG", "BSEC", "BSED", "BSET", "BSIS", "BSAS", "BSIK", "BSAK",
+      "BSID", "BSAD", "ACDOCA", "ACDOCT", "ACDOCC", "ACDOCP", "FAGLFLEXA",
+      "FAGLFLEXT", "GLT0", "GLT3", "VBKPF", "VBSEG", "VBSEC", "REGUH", "REGUP"
+    ],
+    "PROCUREMENT": [
+      "EKKO", "EKPO", "EKET", "EKKN", "EKBE", "EKBZ", "EBAN", "EBKN", "ESLL",
+      "ESUH", "ESUP", "ESUC", "MEPO", "MARC", "MEAN"
+    ],
+    "SALES": [
+      "VBAK", "VBAP", "VBEP", "VBKD", "VBPA", "VBFA", "VBUK", "VBUP", "VBKA",
+      "VEDA", "LIKP", "LIPS", "VBRK", "VBRP", "KNVV", "KNVP"
+    ],
+    "PAYMENTS": [
+      "PAYR", "PAYRQ", "REGUH", "REGUP", "REGUT", "REGUD", "REGUC", "REGUV",
+      "T012", "T012K", "T012T", "FEBKO", "FEBEP", "FEBRE", "FEBPI", "FEBCL",
+      "FEBC", "FEBC_FEBKO"
+    ],
+    "BANK_CONFIG": [
+      "T012", "T012K", "T012T", "T012C", "T012D", "T012F", "T012H", "T012P",
+      "BNKA", "BNKB", "BNKK", "FEBA", "TBKK_BANK"
+    ],
+    "TAX_CONFIG": [
+      "T007A", "T007B", "T007K", "T007L", "T007S", "T030K", "T030R", "T030U",
+      "T683S", "T683", "TFKB", "T030"
+    ],
+    "PRODUCTION": [
+      "PLPO", "PLKO", "PLKZ", "MAPL", "PLAB", "CAUFV", "AUFK", "AFKO", "AFPO",
+      "AFRU", "AFFL", "AFFH", "AFVC", "AFVU", "AFVV", "RESB", "MDVM"
+    ],
+    "QUALITY": [
+      "QMEL", "QMIH", "QMSM", "QMSP", "QMFE", "QMUR", "QMMA", "QMMA1", "IHPA",
+      "QPMK", "QPMT", "QPGR", "QPGT", "QAMR", "QAMV", "QAMB", "QASR", "QASV"
+    ],
+    "CHANGE_DOCS": [
+      "CDHDR", "CDPOS", "JCDS", "JCDO", "DBTABLOG"
+    ],
+    "HR_PAYROLL": [
+      "PA0001", "PA0002", "PA0003", "PA0006", "PA0007", "PA0008", "PA0009",
+      "PA0014", "PA0015", "PA0016", "PA0017", "PA0021", "PA0027", "PA0040",
+      "PA0041", "PA0105", "PA0185", "PA0207", "PA0208", "PA0209", "PA0210",
+      "HRP1000", "HRP1001", "HRP1007", "PCL1", "PCL2", "PCL3", "PCL4"
+    ],
+    "ASSET_ACCOUNTING": [
+      "ANLA", "ANLB", "ANLC", "ANLP", "ANLZ", "ANLAV", "ANLH", "ANEK", "ANEP",
+      "ANEA", "ANLI", "ANLU", "ANLT", "ANKA", "ANKT", "ANKB", "ANKBLG", "T093",
+      "T093A", "T093B", "T093C", "T093T", "T095", "T096", "T097", "T098"
+    ],
+    "COST_CENTER": [
+      "CSKS", "CSKT", "CSKB", "CSKBT", "CSSL", "CSSK", "SETHEADER", "SETLEAF",
+      "SETNODE", "TKA01", "TKA02", "TKA03", "TKA05"
+    ],
+    "PROFIT_CENTER": [
+      "CEPC", "CEPCT", "CEPC_BUKRS", "GLPCT", "GLPCA", "GLPCC", "GLPCP",
+      "TKA01", "SETHEADER", "SETLEAF"
+    ],
+    "TREASURY": [
+      "VTBFHA", "VTBFHAPO", "VTBFHAZU", "VTIDER", "VTIFHA", "VTIFHAPO", "VTIFHAZU",
+      "VTVBAR", "VTVKZUVERS", "TPM_HEADER", "TPM_TRGRP", "TPM_TRGRPT"
+    ],
+    "INTERCOMPANY": [
+      "T001U", "T001UA", "T001V", "ANEK", "BSEG_BUPLA", "BKPF_BUKRS"
+    ],
+    "MATERIAL_MASTER": [
+      "MARA", "MARC", "MARD", "MARM", "MAKT", "MBEW", "MLAN", "MLGN", "MLGT",
+      "MVKE", "MEAN", "MAPL", "MAST"
+    ],
+    "DELIVERY": [
+      "LIKP", "LIPS", "VBUK", "VBUP", "VBPA", "VBKD"
+    ],
+    "TRANSFER_ORDER": [
+      "LTAK", "LTAP", "LTAP_WMS", "LAGP", "T334T", "TAGP", "T100"
+    ],
+    "HANDLING_UNIT": [
+      "VEKP", "VEPO", "HUMSEG", "HUSSTAT", "HUMTAB", "HUMSEG_ITEM", "VHUE_HEAD"
+    ],
+    "EQUIPMENT": [
+      "EQUI", "EQUZ", "EQKT", "EQBS", "EQUI_SBO", "ITOB"
+    ],
+    "SHIPMENT": [
+      "VTTK", "VTTP", "VTTS", "VTSP", "VFKK", "VFKP"
+    ],
+    "GOODS_MOVEMENT": [
+      "MSEG", "MKPF", "MARD", "MCHB", "MCHA", "MCH1", "MARC", "RESB"
+    ],
+    "BATCH_MASTER": [
+      "MCHA", "MCHB", "MCH1", "MCHX", "MCHQ", "INOB"
+    ],
+    "STORAGE_BIN": [
+      "LAGP", "LQUA", "LSER", "TAGP"
+    ]
+  },
+
+  "custom_transaction_prefix": ["Z", "Y"],
+  "custom_table_prefix": ["Z", "Y"],
+  "custom_program_prefix": ["Z", "Y"],
+
+  "master_data_tables": [
+    "PLPO", "PLKO", "PLKZ", "QMSP", "LFA1", "LFB1", "LFBK", "LFM1", "KNA1",
+    "KNB1", "KNVV", "USR02", "MARA", "MARC", "MARD", "ANLA", "ANLB", "CSKS",
+    "CEPC", "SKA1", "SKB1", "BNKA", "T012"
+  ],
+
+  "config_transactions": [
+    "SM30", "SM31", "SM34", "SPRO", "OPK8", "OPPQ", "OPJK", "OPJJ", "OB52",
+    "OBA7", "OBYC", "OBY6", "OB08", "OB22", "OBA1", "OB40", "OBYA", "OBVCU",
+    "OKB9", "OKKP", "OKEN", "OB10", "OB28", "OB29", "OB37", "OB38", "OB45",
+    "OB67", "FBKP", "FBZP"
+  ],
+
+  "evidence_rules": {
+    "transaction_started_only": "A 'Transaction Started' event (SM20 audit log) does NOT prove data was modified. Only change records (CDPOS) with Table/Field/Old val/New val prove actual modifications.",
+    "custom_tables": "Any config transaction (SM30/SE16N) modifying tables starting with Z or Y is a custom configuration change — always report with the exact table name and field.",
+    "master_vs_transactional": "Changes to master data tables (LFA1, KNA1, MARA, USR02, ANLA) are higher severity than transactional data changes (BSEG, EKPO, VBAP). Report separately with different severities.",
+    "auto_propagated_changes": "If a CHANGE LOG shows BKPF.AEDAT, BKPF.UPDDT, MARA.LAEDA, LFA1.AEDAT, KNA1.AEDAT, or USR02.TRDAT changing — these are automatic kernel updates, NOT separate user actions. Do not count as additional findings unless the underlying object change is itself suspicious.",
+    "change_indicator_meanings": "I=Insert (new record), U=Update (field change with Old/New val), D=Delete (record deletion), E=Single field deletion. Treat I+U combos on the same key as the natural pattern for new-record creation.",
+    "header_vs_line_changes": "When BKPF (header) has only AEDAT/UPDDT changes but BSEG (lines) has substantive field changes (WRBTR, ZTERM, ZBD1P, etc.), the line items are the actual user action — the header changes are auto-updates. Quote the line item fields, not the header timestamps.",
+    "cdhdr_cdpos_relationship": "CDHDR is the change document header (one per save action). CDPOS contains the field-level changes. Multiple CDPOS entries for the same CDHDR_OBJECTID at the same timestamp = one save action with many fields, NOT a script."
+  },
+
+  "failed_reason_codes": {
+    "1": "Authorization missing for transaction (general — could be overzealous role design or boundary testing)",
+    "2": "Transaction does not exist — typo (LOW risk; user fat-fingered a code that doesn't exist)",
+    "3": "Transaction is locked via SM01 (admin disabled it — user encounter is informational)",
+    "4": "Transaction not found in user menu (cosmetic, not a security event)",
+    "5": "Transaction does not start (program error or runtime issue, not a security event)",
+    "6": "No authorization (actual auth check failed — HIGH risk indicator of privilege boundary testing if repeated)",
+    "7": "Authorization buffer error (technical, retry usually succeeds — LOW risk)",
+    "8": "Insufficient memory / timeout (technical, not security)",
+    "9": "Cancelled by user (user pressed F12 or back — informational)",
+    "A": "Authorization check via S_TCODE failed (similar to 6 but for the tcode-level check specifically)"
+  },
+
+  "admin_health_checks": [
+    "ST22", "SM37", "SM21", "SM50", "SM51", "SM66", "STAD", "STAT", "SLG1",
+    "DB02", "DB12", "DB13", "DB14", "SM12", "SM13", "SM04", "AL08", "AL11",
+    "SM36", "SM37C", "RZ20", "RZ21", "ST02", "ST03", "ST04", "ST06", "OS01",
+    "OS03", "OS04", "OS05", "OS06", "OS07", "OS08"
+  ],
+
+  "toxic_combinations": {
+    "procure_to_pay_create": {
+      "description": "Full P2P fraud lifecycle — vendor master modification combined with PO creation/modification in same session by same actor",
+      "indicators": ["Vendor master change (XK02/FK02/BP/MASS) + PO action (ME21N/ME22N) in same session"],
+      "severity": "CRITICAL SoD violation",
+      "watch_for": ["LFBK changes specifically — vendor bank routing", "Alternative payee changes (LFA1.LNRZA, LFB1.EMPFK)", "Payment block removal (LFB1.ZAHLS)"]
+    },
+    "procure_to_pay_full": {
+      "description": "Vendor + PO + Goods Receipt + Invoice + Payment all in one session by one actor",
+      "indicators": ["XK02 + ME21N + MIGO + MIRO + F-58 within same session, or any 3+ of these combinations"],
+      "severity": "CRITICAL — bypasses 4-eyes principle entirely"
+    },
+    "order_to_cash": {
+      "description": "Full O2C fraud lifecycle — credit limit modification, sales order, delivery, billing in same session",
+      "indicators": ["FD32 (credit) + VA01/VA02 + VL01N/VL02N + VF01 in same session"],
+      "severity": "CRITICAL SoD violation"
+    },
+    "user_provisioning_self_grant": {
+      "description": "User creates/modifies a user account and grants themselves or a related account elevated roles",
+      "indicators": ["SU01 changes + PFCG role assignment + login as the new user, all within session"],
+      "severity": "CRITICAL backdoor"
+    },
+    "journal_entry_then_clear": {
+      "description": "Manual journal entry posted, then immediately cleared by same user (covers tracks)",
+      "indicators": ["FB01/FB50 + F-03/FB1S in same session targeting same documents"],
+      "severity": "HIGH — possible transaction concealment"
+    },
+    "asset_create_then_dispose": {
+      "description": "Asset created and disposed within short window, possibly with retirement to write-off",
+      "indicators": ["AS01 + ABAVN/ABAON + F-90/F-92 within session"],
+      "severity": "HIGH — asset misappropriation pattern"
+    },
+    "config_change_during_close": {
+      "description": "G/L account, tax config, or posting period config changed during financial close",
+      "indicators": ["OB52 + FS00/SA39 + FB01 in window of fiscal close (last business day of month/quarter/year)"],
+      "severity": "CRITICAL — bypasses period controls"
+    },
+    "payroll_data_self_modification": {
+      "description": "User modifies their own HR records and triggers payroll",
+      "indicators": ["PA30 on own personnel number + PA03/PAUX in same session"],
+      "severity": "CRITICAL fraud"
+    },
+    "transport_bypass_production": {
+      "description": "Direct table edit in production via SE16N &SAP_EDIT or SM30 without transport request",
+      "indicators": ["SE16N with &SAP_EDIT flag", "SM30 modifications without TR number captured", "SE38 program execution writing to tables"],
+      "severity": "CRITICAL — bypasses entire SAP change management"
+    },
+
+    "po_quantity_or_price_inflation": {
+      "description": "Purchase order line/schedule quantity or unit price increased after creation — direct procurement fraud lever",
+      "indicators": [
+        "EKPO.MENGE [U] new>old (especially ≥2x or >100 unit absolute increase) via ME22N/ME23N or SE16(N)",
+        "EKET.MENGE [U] new>old in same window",
+        "EKPO.NETPR / EKPO.NETWR / EKPO.BRTWR [U] increased — particularly with currency switch (e.g. EUR→USD)",
+        "EKPO.PEINH or BPRME unit-base changes inflating line value silently"
+      ],
+      "watch_for": [
+        "Same actor doing ME22N/ME23N CDPOS write while requested_tcode=SE16",
+        "Subsequent MIGO 101 receipt at the inflated quantity",
+        "Subsequent MIRO/F-58 invoice and payment matching the inflated PO"
+      ],
+      "severity": "CRITICAL purchasing fraud",
+      "uc_tag": "financial_fraud"
+    },
+
+    "delivery_then_reverse_GI": {
+      "description": "Delivery created (VL01N/VL02N) followed by reverse goods issue (VL09 or MB1A 262) without subsequent re-issue or operational explanation — silent inventory removal",
+      "indicators": [
+        "VL01N delivery create → VL09 reverse GI on the same VBELN with no follow-on VL02N re-post within reasonable window",
+        "Mass VL09 events that are NOT followed by re-VL02N in 30 minutes",
+        "Same actor performs VL01N + VL09 against same VBELN"
+      ],
+      "watch_for": [
+        "LIPS.LFIMG quantity reduced after pick (LT0A confirm) — stock vanishes between confirmation and goods issue",
+        "LIPS.LGORT / LIPS.WERKS changed mid-delivery — diversion to off-warehouse storage"
+      ],
+      "severity": "CRITICAL inventory theft",
+      "uc_tag": "logistic_fraud"
+    },
+
+    "transfer_order_create_then_cancel": {
+      "description": "Mass transfer order create (LT01) and cancel (LT12/LT0K) in same session — paper trail erasure for inventory diversion",
+      "indicators": [
+        "LT01 + LT12 in same session same actor",
+        "LT0A confirm of TO whose destination LGORT differs from baseline",
+        "Mass LT12 deletion with no audit-trail of why"
+      ],
+      "severity": "HIGH inventory diversion",
+      "uc_tag": "logistic_fraud"
+    },
+
+    "phantom_stock_creation": {
+      "description": "Initial stock entry (movement type 561 via MB1C) creating inventory from nothing without procurement linkage",
+      "indicators": [
+        "MB1C 561 movements posted by non-Basis-during-go-live actor",
+        "MB1A 562 reversing a 561 to mask the trail",
+        "MSEG entries for movement 561/562/501/502 outside documented inventory-load windows"
+      ],
+      "severity": "CRITICAL inventory fraud",
+      "uc_tag": "logistic_fraud"
+    },
+
+    "shipment_cover_up": {
+      "description": "Shipment header deletion or status manipulation after delivery posting — cover-up of physical movement records",
+      "indicators": [
+        "VT70 delete shipment after VL02N goods issue posted",
+        "VTTK manual status change to a finalized/locked state on the same actor",
+        "VTSP segment manipulation hiding stops"
+      ],
+      "severity": "HIGH",
+      "uc_tag": "logistic_fraud"
+    },
+
+    "equipment_misappropriation": {
+      "description": "Equipment master ownership / location / status modified outside of a service order or PM workflow",
+      "indicators": [
+        "EQUI.SERNR/EQUNR/EQTYP changed via IE02 without IW32 maintenance order context",
+        "EQUI plant/location change to different cost-bearing org",
+        "EQUZ status change to scrapped/idle that doesn't match maintenance plan"
+      ],
+      "severity": "HIGH",
+      "uc_tag": "logistic_fraud"
+    },
+
+    "handling_unit_repack_to_mask_quantity": {
+      "description": "Handling unit content re-packed (item moved between HUs) without supporting transfer order — common cover-up for partial diversion",
+      "indicators": [
+        "VEKP / VEPO modifications via HU02 with quantity rebalancing across HUs",
+        "HUMSEG entries with material/quantity reassignment without LTAK reference"
+      ],
+      "severity": "MEDIUM-HIGH",
+      "uc_tag": "logistic_fraud"
+    },
+
+    "billing_cancellation_at_scale": {
+      "description": "Mass cancellation of billing documents (VF11) — revenue manipulation or unauthorized credit issuance",
+      "indicators": [
+        "≥10 VF11 in one session by same actor with no VF01/VF02 re-bill follow-up",
+        "VBRK/VBRP cancellation without service or quality notification linkage"
+      ],
+      "severity": "HIGH revenue manipulation",
+      "uc_tag": "financial_fraud"
+    },
+
+    "ob52_then_backdated_post": {
+      "description": "Posting period reopen via OB52 followed by backdated FI document posting in the reopened period",
+      "indicators": [
+        "OB52 modification of T001B period control",
+        "FB01/FB50/FB02 with BUDAT in the reopened period within 24 hours of the OB52 change",
+        "Reversal (FB08/FBR2) targeting documents in the reopened period"
+      ],
+      "severity": "CRITICAL period control bypass",
+      "uc_tag": "financial_fraud"
+    },
+
+    "se37_rfc_read_table_extract": {
+      "description": "SE37 invocation of RFC_READ_TABLE / BBP_RFC_READ_TABLE / RFC_GET_TABLE_ENTRIES with high ROWCOUNT, especially against AGR_*, USR0*, PA0*, BSEG, LFBK — direct bulk extract via function module",
+      "indicators": [
+        "SE37 + function module RFC_READ_TABLE / BBP_RFC_READ_TABLE / RFC_GET_TABLE_ENTRIES",
+        "ROWCOUNT parameter set to a large value (>10000)",
+        "OPTIONS filter referencing sensitive table by name (AGR_USERS, USR02, PA0008, PA0009, LFBK, KNBK)"
+      ],
+      "severity": "CRITICAL data exfiltration",
+      "uc_tag": "data_exfiltration"
+    },
+
+    "custom_z_program_data_export": {
+      "description": "Custom (Z*/Y*) program executed via SE38/SA38 reading sensitive tables, often with RFC_READ_TABLE inside, sometimes named ZRFC_DOWNLOAD / Z*_EXPORT / Z*_EXTRACT",
+      "indicators": [
+        "SE38 / SA38 execution of Z*/Y* program whose name contains DOWNLOAD/EXPORT/EXTRACT/DUMP",
+        "Z program execution that calls RFC_READ_TABLE on AGR_USERS / USR02 / PA0* / BSEG / LFBK"
+      ],
+      "severity": "CRITICAL data exfiltration",
+      "uc_tag": "data_exfiltration"
+    },
+
+    "debugger_protected_field_change": {
+      "description": "ABAP debugger (/h) used to bypass screen authority and change a protected field directly in memory before save",
+      "indicators": [
+        "Successful SE38/SE80 followed by /h debug entry on a transaction touching high-tier fields (WRBTR, MENGE, BANKL, BANKN, IBAN, ZLSCH, ZBFIX, USR02.UFLAG, AGR_USERS.AGR_NAME)",
+        "Same actor + immediate CDPOS write on tier_high field via tcode that normally requires workflow approval"
+      ],
+      "severity": "CRITICAL",
+      "uc_tag": "financial_fraud"
+    },
+
+    "audit_disable_then_modify": {
+      "description": "RSAU_CONFIG / SM19 audit configuration changed (or DBTABLOG modified) followed by financial / privilege changes by same actor — audit suppression preceding the act",
+      "indicators": [
+        "RSAU_CONFIG / SM19 modification by non-Basis-Audit actor",
+        "DBTABLOG configuration change",
+        "Followed within window by FB01/FBV0/PFCG/SU01/MIRO by same actor"
+      ],
+      "severity": "CRITICAL evidence tampering",
+      "uc_tag": "financial_fraud"
+    },
+
+    "sicf_then_external_egress": {
+      "description": "SICF/SOAMANAGER service activated/created in production followed by data-bearing transactions or RFC calls — external HTTP egress preparation",
+      "indicators": [
+        "SICF service activation in PRD by non-Basis actor",
+        "SOAMANAGER endpoint registration",
+        "STRUST certificate import",
+        "SM59 RFC destination create pointing to external host"
+      ],
+      "severity": "HIGH-CRITICAL external egress prep",
+      "uc_tag": "data_exfiltration"
+    },
+
+    "tcode_deviation_with_high_tier_change": {
+      "description": "Firefighter session has Tcode Deviation = YES (approved tcode != actual tcode) AND a high-tier-field change is recorded — actual activity exceeded the approved scope",
+      "indicators": [
+        "Requested Tcode != Transaction Code (SAP GRC tcode-deviation flag)",
+        "And concurrent CDPOS [U/I/D] on tier_high field per field_type_awareness.control_fields_high_risk"
+      ],
+      "severity": "HIGH-CRITICAL scope compliance violation",
+      "uc_tag": "any (scope_compliance flag)"
+    }
+  },
+
+  "data_scraping_threshold": 15,
+  "data_scraping_description": "15+ direct reads of the same sensitive table via SE16/SE16N/SE16H in one session indicates data scraping. Master data tables (KNA1, LFA1, USR02, MARA) are higher-risk targets. Read-only access (activity 03) on configuration tables is reconnaissance, not modification.",
+
+  "system_users": [
+    "SAPSYS", "DDIC", "SAP*", "ALEREMOTE", "WF-BATCH", "TMSADM", "SAPCPIC",
+    "EARLYWATCH", "SAPSUPPORT", "SOLMAN_BTC"
+  ],
+
+  "system_user_types": {
+    "DIALOG": "Normal interactive user — should generate user-driven SM20 events with terminal info",
+    "SYSTEM": "Background/RFC user — programmatic access, no terminal expected (e.g. WF-BATCH, ALEREMOTE)",
+    "COMMUNICATION": "RFC-only user, cannot do dialog logon (e.g. CPIC users)",
+    "SERVICE": "Anonymous service user (e.g. internet-facing apps) — should never have wide auth",
+    "REFERENCE": "Template user, should never log in directly",
+    "rules": "DIALOG users doing what looks like SYSTEM activity (millisecond gaps, batch programs) usually means a script — see if it correlates to an authorized job (SM37). SYSTEM users doing DIALOG-like activity (interactive transactions like SU01, SE16N) is suspicious — investigate."
+  },
+
+  "field_type_awareness": {
+    "value_fields": [
+      "WRBTR", "DMBTR", "DMBE2", "DMBE3", "NETWR", "NETPR", "MENGE", "WMENG",
+      "BRTWR", "EFFWR", "QUANTITY", "BUDAT_AMT", "MWST", "STEUR", "SKFBT",
+      "SKNTO", "WSKTO", "ZBETR", "ZWERT", "GBETR", "OBETR", "BETRG"
+    ],
+    "id_fields": [
+      "AUGBL", "BELNR", "GJAHR", "BUZEI", "ADDRNUMBER", "PERSNUMBER", "IDENTITY_GUID",
+      "VGBEL", "VGPOS", "DOC_NUMBER", "VBELN", "POSNR", "MBLNR", "EBELN", "EBELP"
+    ],
+    "physical_fields": [
+      "BRGEW", "NTGEW", "VOLUM", "GROES", "LAENG", "BREIT", "HOEHE", "MEINS",
+      "GEWEI", "VOLEH", "LFIMG", "LGMNG"
+    ],
+    "date_fields": [
+      "BUDAT", "BLDAT", "AEDAT", "ERDAT", "TRDAT", "VALDT", "CPUDT", "BUDAT_MKPF",
+      "FAEDT", "ZFBDT", "BLAUM", "VBELN_VAUF"
+    ],
+    "control_fields_high_risk": [
+      "ZBD1P", "ZBD2P", "ZBD3P", "ZBD1T", "ZBD2T", "ZBD3T", "ZTERM", "ZLSCH",
+      "ZAHLS", "ZINDT", "ZINKZ", "MWSKZ", "TXJCD", "XMWNO", "MANSP", "MABER",
+      "DUNNING_BLOCK", "PAYMENT_BLOCK", "AUSZG", "ESRNR", "EMPFK", "LNRZA",
+      "BANKL", "BANKN", "BANKS", "SWIFT", "BIC", "IBAN", "BNKLZ", "BKONT",
+      "EMPFG", "ZBFIX",
+      "MENGE", "WMENG", "LFIMG", "BAMNG", "WEMNG", "BPMNG",
+      "NETPR", "NETWR", "BRTWR", "WRBTR", "DMBTR", "KBETR", "BETRG",
+      "BWART", "LGORT", "WERKS", "CHARG",
+      "AUFSD", "LIFSP", "SPERR", "ZAHLS",
+      "BNAME", "USTYP", "CLASS", "UFLAG", "AGR_NAME",
+      "PERNR", "STAT2", "MSTAT", "STATX", "BEGDA", "ENDDA",
+      "BUDAT", "BLDAT", "MONAT", "GJAHR"
+    ],
+    "rules": "WRBTR/DMBTR/DMBE2 are CURRENCY amounts. BRGEW/NTGEW/VOLUM are PHYSICAL weights/volumes — never describe physical-field changes as 'financial loss'. IDENTITY_GUID is a system linkage GUID, NOT a credential or password hash. Date fields auto-update (AEDAT, ERDAT, TRDAT) on related actions and are usually side-effects. Control fields (ZBD1P, ZTERM, ZLSCH, MWSKZ, MANSP, EMPFK, LNRZA, BANKL/BANKN) are HIGHEST-RISK because they govern WHEN/HOW/WHERE money flows — changes to these fields warrant scrutiny regardless of the transaction used."
+  },
+
+  "tcode_behavior_facts": {
+    "description": "Important behaviors of standard SAP transactions that affect interpretation. SAP help and forums confirm these as standard features, not exploits.",
+    "facts": {
+      "FBL5N_FBL3N_FBL1N": "Despite being called 'display' transactions, FBL5N (customer line items), FBL3N (G/L line items), and FBL1N (vendor line items) all expose the menu path 'Environment → Document → Change' and a 'Mass Change' button (Ctrl+Shift+F9). Mass Change calls function module MASS_CHANGE_FI to update payment terms, dunning data, payment methods, text, and assignment fields across selected line items. Change records on BSEG/BKPF originating from FBL3N/FBL5N/FBL1N are STANDARD AR/AP clerk activity, NOT BAdI/exit exploits.",
+      "FB02": "Document change. Limited to fields permitted by the document-change rules table T030U. Cannot change posted amounts — only ancillary fields (ZTERM, payment block, text). Multiple BSEG line changes from one FB02 save = one user action.",
+      "MASS": "Generic mass-maintenance transaction. Available for material master, customer master, vendor master, sales order, purchase order, etc. High-volume legitimate change source.",
+      "MM17_BMBC": "Material mass maintenance. Hundreds of MARA/MARC changes per save is normal.",
+      "F.13_F-32_F-44": "Automatic clearing programs. Generate large numbers of clearing assignments (AUGBL on BSEG records) per run. Hundreds of clearings at the same timestamp from a single F.13 run is standard.",
+      "FBRA": "Reset cleared items (mass clearing reversal). Designed for fixing botched payment runs or bank statement imports. Volume often equals the original F110 run's document count.",
+      "F110": "Automated payment program. Produces large volumes of REGUH/REGUP entries and BSEG clearings. A failed F110 run is the most common cause of subsequent FBRA mass reversals.",
+      "F.05_FAGL_FC_VAL": "Foreign currency revaluation. Period-end batch program that revalues open items at month-end exchange rates. Generates large numbers of journal entries to revaluation accounts. Standard month-end activity.",
+      "AFAB": "Asset depreciation run. Generates one document per asset per period. Runs once per period (monthly). Produces hundreds to thousands of postings — all expected.",
+      "AJAB_AJRW": "Year-end asset closing and balance carryforward. Once-a-year mass operations affecting all assets — entirely expected.",
+      "RFFOEDI1_RFFOUS_T_RFFOAVIS": "Standard payment medium programs. Run as part of F110 to produce bank files.",
+      "SE16N_with_SAP_EDIT": "Setting the user parameter '&SAP_EDIT' switches SE16N from read-only to edit mode. ANY use of this parameter on production is a transport-bypass policy violation regardless of intent.",
+      "SHDB_SM35": "Batch input recording and processing. Recordings replay user actions — often used legitimately for data migration. The recording session itself produces a flood of CHG records at machine speed; this is the design, not automation abuse.",
+
+      "VL09": "Reverse goods issue. Used legitimately to correct wrong goods issues (then immediately re-VL02N). High counts of VL09 with NO subsequent VL02N re-post on the same VBELN within ~30 minutes is a silent-inventory-removal red flag.",
+      "VL02N": "Change outbound delivery — covers picking, packing, post goods issue. Legitimate uses include LGORT change for staging. LGORT switches from a tracked location to a non-tracked one mid-pick is suspicious.",
+      "LT0A": "Confirm transfer order (pick confirmation). Should match the planned LTAP quantities (WMENG vs VFMNG). Material/quantity divergences at confirmation are suspicious.",
+      "LT12": "Cancel transfer order. Mass LT12 in same session is a paper-trail erasure pattern — investigate WHICH TOs were cancelled and whether stock movements happened anyway.",
+      "MB1A_262": "Reverse goods issue movement. 262 reverses 261. Legitimate when paired with a wrong-quantity correction; suspicious when not paired.",
+      "MB1C_561": "Initial entry of stock balance. Creates inventory FROM NOTHING — only valid during system go-live or documented inventory loads. Outside those windows it is phantom-stock creation.",
+      "VT70": "Delete shipment. Should NEVER delete a shipment whose VBELN-LIPS link was already active (i.e., GI posted) — that is shipment cover-up.",
+      "SE37_RFC_READ_TABLE": "Direct invocation of RFC_READ_TABLE function module via SE37 lets an actor bulk-extract any table the actor has read on. ROWCOUNT > 10000 against AGR_USERS / USR02 / PA0008 / PA0009 / LFBK / KNBK / BSEG is direct exfil — not a developer test.",
+      "OB52_period_control": "Open posting periods. Legitimate at month-end close coordination — but reopening a closed period followed by FB01/FB50/FB02 backdated postings within 24 hours is bypass of period control.",
+      "Custom_namespace_tcodes": "Tcodes inside customer namespace (/<NAMESPACE>/<NAME> e.g. /MVNT/ADMIN, /SAPSII/*) are vendor or customer-built. They are unaudited unless explicitly registered in the audit framework. Treat repeated custom-namespace tcode usage by a firefighter session as 'requires manual review'.",
+      "VF11_billing_cancellation": "Cancel billing document. Legitimate corrections occur in pairs (VF11 + new VF01). ≥10 VF11 with no follow-on VF01 in same session is revenue manipulation.",
+      "Tcode_Deviation_flag": "When the audit log's Tcode Deviation column is YES (Requested Tcode != Transaction Code), the firefighter executed something OUTSIDE the approved scope. Combined with any high-tier field change, this is a hard policy violation regardless of business intent — score floor 70."
+    }
+  },
+
+  "ticket_scope_table_mapping": {
+    "description": "Maps ticket intent keywords to the SAP tables they legitimately cover. Used by the challenger to deterministically verify scope alignment instead of letting the LLM guess.",
+    "mappings": {
+      "address": ["ADRC", "ADR2", "ADR3", "ADR6", "ADRT", "ADRCT", "EBAN", "LFA1", "KNA1", "BUT000", "BUT020"],
+      "delivery": ["EBAN", "LIKP", "LIPS", "VBEP", "ADRC", "ADR6", "VBPA"],
+      "date": ["QMEL", "QMIH", "QMSM", "EBAN", "EKKO", "EKET", "VBAK", "VBEP", "BKPF"],
+      "vendor": ["LFA1", "LFB1", "LFB5", "LFBK", "LFBW", "LFM1", "LFM2", "ADRC", "ADR6"],
+      "customer": ["KNA1", "KNB1", "KNB5", "KNBK", "KNVV", "KNVI", "KNVK", "KNVP", "ADRC", "ADR6"],
+      "payment": ["PAYR", "REGUH", "REGUP", "REGUT", "BSEG", "BKPF", "BSAK", "BSAD", "BSIK", "BSID"],
+      "user": ["USR02", "USR04", "USR21", "USR40", "USR41", "AGR_USERS", "AGR_DEFINE"],
+      "role": ["AGR_DEFINE", "AGR_1251", "AGR_1252", "AGR_USERS", "AGR_FLAGS", "AGR_TCODES", "AGR_PROF"],
+      "material": ["MARA", "MARC", "MARD", "MARM", "MAKT", "MBEW", "MVKE", "MEAN"],
+      "production": ["PLPO", "PLKO", "PLKZ", "MAPL", "CAUFV", "AUFK", "AFKO", "AFPO", "AFRU", "AFFL"],
+      "quality": ["QMEL", "QMIH", "QMSM", "QMSP", "QMFE", "IHPA", "QPMK", "QPMT"],
+      "pricing": ["KONV", "KONH", "KONP", "A005", "A304", "T685", "T685T"],
+      "transport": ["E070", "E071", "E07T", "TRDIR"],
+      "payroll": ["PA0001", "PA0002", "PA0003", "PA0006", "PA0007", "PA0008", "PA0014", "PA0015", "PA0017", "PA0027", "HRP1000", "HRP1001"],
+      "billing": ["VBRK", "VBRP", "BKPF", "BSEG"],
+      "asset": ["ANLA", "ANLB", "ANLC", "ANLP", "ANLZ", "ANEK", "ANEP", "ANEA", "ANKA", "ANKB"],
+      "cost_center": ["CSKS", "CSKT", "CSKB", "CSSL", "CSSK", "SETHEADER", "SETLEAF", "SETNODE"],
+      "profit_center": ["CEPC", "CEPCT", "GLPCT", "GLPCA"],
+      "bank": ["BNKA", "T012", "T012K", "T012T", "FEBKO", "FEBEP"],
+      "tax": ["T007A", "T007B", "T030K", "T683", "T683S"],
+      "gl_account": ["SKA1", "SKB1", "SKAT", "CSKAB"],
+      "purchase_order": ["EKKO", "EKPO", "EKET", "EKKN", "EKBE", "EBAN"],
+      "sales_order": ["VBAK", "VBAP", "VBEP", "VBKD", "VBPA", "VBFA"],
+      "invoice": ["RBKP", "RSEG", "BKPF", "BSEG", "VBRK", "VBRP"],
+      "currency": ["TCURR", "TCURT", "TCURX", "TCURF", "TCURV"],
+      "fiscal_period": ["T009", "T009B", "T009T", "T001B"],
+      "intercompany": ["T001U", "T001UA", "BUKRS", "BSEG"],
+      "delivery_processing": ["LIKP", "LIPS", "VBPA", "VBKD", "VBUK", "VBUP"],
+      "transfer_order": ["LTAK", "LTAP", "LTAP_WMS", "LAGP"],
+      "handling_unit": ["VEKP", "VEPO", "HUMSEG", "HUSSTAT", "HUMTAB"],
+      "shipment": ["VTTK", "VTTP", "VTTS", "VTSP"],
+      "equipment": ["EQUI", "EQUZ", "EQKT", "EQBS", "ITOB"],
+      "physical_inventory": ["MSEG", "MKPF", "MARD", "MCHB", "MARC"],
+      "batch_management": ["MCHA", "MCHB", "MCH1", "MCHX"],
+      "warehouse": ["LAGP", "LQUA", "LSER", "TAGP"]
+    },
+    "system_config_tables_never_in_scope": [
+      "INRIV", "NRIV", "T000", "T001", "TSTC", "TSTCT", "TSTCP", "DEVACCESS",
+      "TDEVC", "TADIR", "TRDIR", "USR02", "USR04", "AGR_DEFINE", "AGR_USERS",
+      "AGR_1251", "AGR_TCODES", "USOBT", "USOBT_C", "USOBX", "USOBX_C",
+      "RSAU_*", "T100", "T100C", "REPOSRC", "D010S"
+    ]
+  },
+
+  "legitimate_high_volume_patterns": {
+    "description": "Operations that LEGITIMATELY produce thousands of change records per session/run. Do not flag volume alone as suspicious for these.",
+    "patterns": [
+      {"trigger": "F110 payment run", "expected_volume": "1 BSEG clearing per open invoice paid + 1 REGUH per payment + 1 REGUP per item", "frequency": "weekly to daily depending on company size"},
+      {"trigger": "F.13 / F-32 / F-44 automatic clearing", "expected_volume": "1 AUGBL set per cleared invoice (often thousands per run)", "frequency": "daily to weekly"},
+      {"trigger": "AFAB depreciation run", "expected_volume": "1 ANLC + 1 BKPF/BSEG per asset per depreciation area per period", "frequency": "monthly per company code"},
+      {"trigger": "F.05 / FAGL_FC_VAL foreign currency valuation", "expected_volume": "1 revaluation entry per open item in foreign currency (thousands typical)", "frequency": "monthly at period close"},
+      {"trigger": "AJAB year-end asset closing", "expected_volume": "1 carryforward per asset (entire asset register)", "frequency": "annually"},
+      {"trigger": "AJRW asset balance carryforward", "expected_volume": "all assets carried to new fiscal year", "frequency": "annually"},
+      {"trigger": "MASS material maintenance", "expected_volume": "1 MARA/MARC change per material × fields changed", "frequency": "ad-hoc, often during catalog updates"},
+      {"trigger": "Batch input session (SM35) replay", "expected_volume": "as recorded — can be thousands at machine speed", "frequency": "ad-hoc, usually data migration or mass corrections"},
+      {"trigger": "FBRA mass reversal of failed F110", "expected_volume": "matches the failed F110's document count", "frequency": "rare, only when F110 fails"},
+      {"trigger": "Number range buffer reset (SNRO/SNUM)", "expected_volume": "many INRIV/NRIV updates at once", "frequency": "as part of system maintenance"},
+      {"trigger": "Authorization buffer refresh (SU56/SU01D)", "expected_volume": "USOBT/USOBX rebuild for affected roles", "frequency": "after role changes"}
+    ]
+  },
+
+  "compliance_event_calendar": {
+    "description": "Known regulatory events that cause mass legitimate changes to specific SAP data. When changes match these patterns, presume compliance/maintenance — not fraud.",
+    "events": [
+      {"name": "Barclays UK Ring-Fencing", "period": "2018-04-01 to 2023-12-31", "tables": ["BNKA"], "fields": ["SWIFT", "BANKL"], "patterns": [{"old": "BARCGB22", "new": "BUKBGB22"}]},
+      {"name": "SEPA Migration", "period": "2014-02-01 to 2016-10-31", "tables": ["BNKA", "T012", "LFBK"], "fields": ["BANKN", "IBAN"], "note": "Mass conversion of BBAN to IBAN across vendor/customer bank details"},
+      {"name": "EUR Currency Migration", "period": "1999-01-01 to 2002-07-01", "tables": ["TCURR", "TCURT", "T001"], "fields": ["WAERS"], "note": "Mass conversion of legacy currencies to EUR"},
+      {"name": "Bank merger SWIFT changes (general)", "period": "ongoing", "tables": ["BNKA"], "fields": ["SWIFT", "BANKL"], "note": "Bank acquisitions and rebrandings periodically force mass SWIFT updates — apply ALL records of same bank, never targeting specific vendors"},
+      {"name": "GST/VAT rate changes", "period": "ongoing per country", "tables": ["T007A", "T007B", "T683S"], "fields": ["KBETR", "MWSKZ"], "note": "Government rate changes force mass tax-config updates"},
+      {"name": "IFRS-16 Lease accounting transition", "period": "2019-01-01 onwards", "tables": ["ANLA", "ANLB"], "note": "Mass asset reclassifications when adopting new lease standard"},
+      {"name": "Withholding tax legislative changes", "period": "ongoing per country", "tables": ["T059P", "T059Z", "WITH_ITEM"], "note": "Tax authority changes force mass withholding configuration"}
+    ]
+  },
+
+  "authorization_objects": {
+    "description": "Key SAP authorization objects and the activity values that determine read vs write access. Use to determine the actual capability granted.",
+    "objects": {
+      "S_TCODE": "Transaction-level access (does user have FBL5N at all?)",
+      "F_BKPF_BUK": "FI document — company code level. Activity 03=display, 01=create, 02=change",
+      "F_BKPF_BLA": "FI document — document type. Activity 01/02/03/06=delete",
+      "F_LFA1_BUK": "Vendor master per company code",
+      "F_LFA1_GRP": "Vendor account group — controls who can create new vendors",
+      "F_KNA1_BUK": "Customer master per company code",
+      "S_TABU_DIS": "Generic table maintenance via SM30. Activity 02=write, 03=display",
+      "S_TABU_NAM": "Table-name level (more granular than S_TABU_DIS)",
+      "S_DEVELOP": "ABAP development — Object types DEBUG, EDITOR, CLAS, FUGR, PROG, TABL",
+      "S_USER_GRP": "User maintenance per user group. Activity 01=create, 02=change, 06=delete",
+      "S_USER_AGR": "Role assignment authorization (PFCG)",
+      "S_USER_AUT": "Authorization data maintenance"
+    },
+    "activity_codes": {
+      "01": "Create / Add",
+      "02": "Change",
+      "03": "Display / Read",
+      "06": "Delete",
+      "07": "Activate, generate",
+      "08": "Display change documents",
+      "16": "Execute",
+      "21": "Transport",
+      "65": "Reorganize"
+    },
+    "rule": "Activity 03 = read only. Activity 01/02/06 = write/modify. SE16N entries with activity 03 are reconnaissance/policy deviation, NEVER 'data manipulation'."
+  },
+
+  "document_types": {
+    "description": "Standard SAP FI document types. The first 2 characters reveal the source.",
+    "types": {
+      "AB": "Accounting document (manual JE)",
+      "DR": "Customer invoice (FB70)",
+      "DG": "Customer credit memo",
+      "DZ": "Customer payment",
+      "KR": "Vendor invoice (FB60)",
+      "KZ": "Vendor payment",
+      "KG": "Vendor credit memo",
+      "RE": "Invoice receipt (MIRO)",
+      "WE": "Goods receipt (MIGO)",
+      "SA": "G/L document (FB01/FB50)",
+      "SU": "Reversal document",
+      "X1": "Recurring entry source",
+      "X2": "Recurring entry execution",
+      "AA": "Asset posting",
+      "AF": "Depreciation posting",
+      "ML": "Material ledger"
+    },
+    "rule": "SA documents posted via FB01 to recently-created G/L accounts with vague text by the same user who created the accounts is a HIGH-RISK signal. SU reversals on the user's own KZ payments deserves scrutiny."
+  },
+
+  "usecase_mapping": {
+    "_doc": "Maps SAP entities (tcode classes / table classes / toxic combos / finding types) to one of the three customer-facing use cases. Used by usecase_classifier.py to tag findings post-challenger. A finding may carry multiple UC tags; classifier picks the highest-priority one as primary.",
+    "use_cases": {
+      "financial_fraud": {
+        "name": "Financial Fraud",
+        "description": "Vendor self-dealing, posting-period manipulation, GL/master tampering, authorization escalation enabling fraud, code injection enabling fraud, purchasing fraud, payment manipulation",
+        "tcode_classes": ["FINANCIAL_SKEW", "ASSET_ACCOUNTING", "COST_CONTROLLING", "TREASURY_BANKING", "CONFIG_MODS", "MASS_PROCESSING", "NUMBER_RANGE_CONFIG"],
+        "table_classes": ["FI_DOCS", "PROCUREMENT", "PAYMENTS", "BANK_CONFIG", "TAX_CONFIG", "VENDOR_MASTER", "CUSTOMER_MASTER", "GL_MASTER", "ASSET_ACCOUNTING", "COST_CENTER", "PROFIT_CENTER", "TREASURY", "INTERCOMPANY", "MATERIAL_MASTER", "CONFIG_CRITICAL"],
+        "toxic_combos": ["procure_to_pay_create", "procure_to_pay_full", "order_to_cash", "journal_entry_then_clear", "asset_create_then_dispose", "config_change_during_close", "po_quantity_or_price_inflation", "billing_cancellation_at_scale", "ob52_then_backdated_post", "debugger_protected_field_change", "audit_disable_then_modify", "transport_bypass_production"],
+        "finding_types": ["financial_fraud", "data_manipulation", "configuration_tampering", "control_field_modification", "configuration_change", "sod_violation", "evidence_tampering"]
+      },
+      "logistic_fraud": {
+        "name": "Logistic Fraud",
+        "description": "Delivery manipulation, goods-issue reversals, inventory theft via transfer orders, shipment diversion/deletion, equipment misappropriation, handling-unit fraud, phantom stock, billing-side cancellations affecting revenue recognition",
+        "tcode_classes": ["LOGISTICS_DELIVERY", "LOGISTICS_TRANSFER_ORDER", "LOGISTICS_HANDLING_UNIT", "LOGISTICS_SHIPMENT", "LOGISTICS_GOODS_MOVEMENT", "LOGISTICS_PHYSICAL_INVENTORY", "LOGISTICS_EQUIPMENT", "LOGISTICS_BATCH"],
+        "table_classes": ["DELIVERY", "TRANSFER_ORDER", "HANDLING_UNIT", "EQUIPMENT", "SHIPMENT", "GOODS_MOVEMENT", "BATCH_MASTER", "STORAGE_BIN", "PRODUCTION", "QUALITY"],
+        "toxic_combos": ["delivery_then_reverse_GI", "transfer_order_create_then_cancel", "phantom_stock_creation", "shipment_cover_up", "equipment_misappropriation", "handling_unit_repack_to_mask_quantity"],
+        "finding_types": ["logistic_fraud", "inventory_theft", "delivery_manipulation"]
+      },
+      "data_exfiltration": {
+        "name": "Data Exfiltration",
+        "description": "Mass data downloads, sensitive table reads outside FF scope, RFC-based extraction, debugger abuse, external HTTP egress, custom export tools, session anomalies revealing impersonation",
+        "tcode_classes": ["DATA_EXFIL_RECON", "EXECUTION_EXPLOIT", "API_WEB_GATEWAY", "BATCH_INPUT_RECORDING", "PERSISTENCE_BACKDOOR", "LOG_TAMPERING"],
+        "table_classes": ["USER_MASTER", "ROLE_AUTH", "DEVELOPER", "CHANGE_DOCS", "HR_PAYROLL"],
+        "toxic_combos": ["se37_rfc_read_table_extract", "custom_z_program_data_export", "sicf_then_external_egress", "user_provisioning_self_grant", "tcode_deviation_with_high_tier_change"],
+        "finding_types": ["data_manipulation", "reconnaissance", "exfiltration", "policy_violation", "scope_creep", "policy_concern", "monitoring_required", "privilege_escalation", "authentication_failure"]
+      },
+      "other": {
+        "name": "Other / Operational",
+        "description": "Findings that do not cleanly map to financial/logistic/exfil — typically informational, system-maintenance noise, or compliance-required disclosures",
+        "finding_types": ["informational", "compliance_maintenance", "data_quality_anomaly"]
+      }
+    },
+    "primary_priority": ["financial_fraud", "data_exfiltration", "logistic_fraud", "other"],
+    "rules": [
+      "If a finding's tcode is in financial_fraud.tcode_classes AND the modified field is in field_type_awareness.control_fields_high_risk AND the field is a money/payment field (WRBTR, DMBTR, NETPR, NETWR, BRTWR, KBETR, BANKL, BANKN, IBAN, ZLSCH, ZBFIX, EMPFG), classify as financial_fraud — even if other UCs would also match.",
+      "If a finding shows direct table read at scale (≥15 reads or RFC_READ_TABLE / Z*_DOWNLOAD pattern) regardless of target UC, classify as data_exfiltration.",
+      "If a finding involves delivery (LIKP/LIPS/VBPA), transfer order (LTAK/LTAP), handling unit (VEKP/VEPO), shipment (VTTK/VTTP), equipment (EQUI/EQUZ), or movement type (BWART) without a financial-doc lever, classify as logistic_fraud.",
+      "If a finding is a tcode-deviation (Tcode Deviation = YES) on a high-tier-field change, tag the primary UC by the tcode/table touched AND additionally tag with 'data_exfiltration' as a scope_compliance signal.",
+      "If a finding cannot be unambiguously mapped, classify as other and let synthesis decide whether to surface it."
+    ]
+  },
+
+  "firefighter_scope_compliance": {
+    "_doc": "Rules for evaluating whether a firefighter session stayed within its approved scope. Drives scope_compliance findings + downstream UC tagging.",
+    "tcode_deviation_rule": {
+      "description": "When the audit log column 'Tcode Deviation' is YES, the actual transaction code differs from what the firefighter was approved for. This is a HARD signal of scope creep regardless of business intent.",
+      "scoring": {
+        "deviation_with_no_change": "INFO — possibly an exploration that didn't save",
+        "deviation_with_low_tier_change": "30-50 (LOW-MEDIUM)",
+        "deviation_with_high_tier_change": "70-90 (HIGH-CRITICAL) — hard floor 70",
+        "deviation_at_volume": "If >50% of the session is deviated, baseline severity is HIGH for the entire session"
+      }
+    },
+    "developer_ffid_rule": {
+      "description": "FFID names containing DEV/ABAP/TECH/ADMIN/IT/BASIS suggest developer or technical firefighter — these accounts have inherently broader risk surface (debugger access, code editor authority).",
+      "examples": ["ALVINDEV", "DEV_ABAP", "TECH_FF_01", "BASIS_FF", "ADMIN_EAM", "FFID_DEV_01"],
+      "rule": "Developer FFIDs should ONLY be used for development-system or break-fix code work. Use against productive transactional/master data (FB01, ME21N, XK02, VL01N) is automatic scope violation regardless of approval status."
+    },
+    "approved_tcode_categorization": {
+      "description": "When the requested/approved tcode differs in CLASS from the actual tcode, the deviation is more severe than a same-class deviation.",
+      "examples": [
+        "approved=SE16 (query class) but actual=ME22N (purchasing) → cross-class deviation = HIGH",
+        "approved=SE16 but actual=PFCG (security class) → cross-class = CRITICAL",
+        "approved=ME21N but actual=ME22N → same purchasing class = LOW (still deviation but lower severity)"
+      ]
+    },
+    "custom_namespace_rule": {
+      "description": "Custom-namespace tcodes (/<NAMESPACE>/<NAME> e.g. /MVNT/ADMIN, /SAPSII/*, /1BCDWB/*) are vendor or customer-built and may not have CDPOS wiring, making them unauditable by default.",
+      "rule": "Repeated custom-namespace tcode usage by a firefighter session = 'requires manual review' at minimum HIGH severity unless the customer's audit framework explicitly registers them."
+    }
+  },
+
+  "code_execution_patterns": {
+    "_doc": "Patterns for detecting privileged code execution that bypasses normal screen/auth controls.",
+    "patterns": {
+      "se37_function_module_direct": {
+        "description": "Direct invocation of a function module via SE37 — bypasses any tcode-level auth check on the underlying transaction",
+        "indicators": ["SE37 in TRANSACTION CODE column", "Function module names like RFC_READ_TABLE, BBP_RFC_READ_TABLE, RFC_GET_TABLE_ENTRIES, BAPI_*_CHANGE, BAPI_*_CREATE on master data"],
+        "ucs": ["data_exfiltration", "financial_fraud", "logistic_fraud"]
+      },
+      "se24_class_direct": {
+        "description": "Direct execution of a class method via SE24 — same bypass profile as SE37 for OO code",
+        "indicators": ["SE24 in TRANSACTION CODE column", "Class methods invoked directly"],
+        "ucs": ["data_exfiltration", "financial_fraud"]
+      },
+      "se38_z_program_export": {
+        "description": "Custom Z*/Y* program executed via SE38/SA38 that reads sensitive tables — often named ZRFC_DOWNLOAD, Z*_EXPORT, Z*_EXTRACT, Z*_DUMP",
+        "indicators": ["SE38/SA38 invoking Z program with DOWNLOAD/EXPORT/EXTRACT/DUMP in name", "Program references RFC_READ_TABLE on AGR_USERS/USR02/PA0*/BSEG/LFBK/KNBK"],
+        "ucs": ["data_exfiltration"]
+      },
+      "abap_debugger_field_change": {
+        "description": "ABAP debugger (/h) used to bypass screen authority and modify a protected field in memory before save",
+        "indicators": ["DEBUG keyword in details / event_class", "/h or transaction-debug entry pattern", "Subsequent CDPOS write on tier_high field via tcode that normally requires workflow"],
+        "ucs": ["financial_fraud", "logistic_fraud", "data_exfiltration"]
+      },
+      "rfc_read_table_bulk": {
+        "description": "RFC_READ_TABLE call (via SE37 or programmatic) with high ROWCOUNT against sensitive tables",
+        "indicators": ["ROWCOUNT > 10000", "OPTIONS filter referencing AGR_USERS/USR0*/PA0*/BSEG/LFBK/KNBK/PAYR"],
+        "ucs": ["data_exfiltration"]
+      }
+    }
+  }
+}
