@@ -177,7 +177,7 @@ def challenge_findings(
             session.start()
             raw = session.send_message(prompt, purpose="challenger_review", timeout=150)
             session.close()
-            result = extract_json(raw)
+            result = extract_json(raw.text)
         except Exception as e:
             log.warning("challenger.batch_failed", error=str(e), batch_start=batch_start)
             # On failure, keep all findings as-is
