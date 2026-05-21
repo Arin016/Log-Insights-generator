@@ -38,6 +38,8 @@ from core.persistence.local_store import (
 )
 from core.scoping.filter_engine import apply_use_case_filter
 from core.verification.retry_handler import verify_and_filter_findings
+from core.react.checkpoint import get_completed_use_cases, get_completed_findings, clear_checkpoint
+from core.react.factory import get_react_runner
 
 
 def _clean_previous_run(rak_id: str) -> None:
@@ -57,11 +59,11 @@ def run_pipeline(
     use_case_configs: dict[str, dict[str, Any]],
     custom_overrides: list[dict[str, Any]],
     register_tools_fn: Callable[[Any], None],
-    react_runner_fn: Callable[..., list[Finding]],
 ) -> RAKReport:
     """Execute the full pipeline. Returns the final RAKReport."""
     rak_id = rak_metadata.request_access_key
     pipeline_start = time.time()
+    react_runner_fn = get_react_runner()
     update_pipeline_state(rak_id, PipelineState.INITIATED)
 
     # ─── Clean previous run artifacts ──────────────────────────────────
@@ -83,6 +85,19 @@ def run_pipeline(
     react_findings_per_use_case: dict[str, list[Finding]] = {}
     react_call_count = 0
 
+    # Resume support: skip use cases that completed in a previous (crashed) run
+    already_done = get_completed_use_cases(rak_id)
+    use_cases_to_run = {uc: scoped for uc, scoped in scoped_per_use_case.items()
+                        if uc not in already_done}
+    if already_done:
+        log.info("pipeline.resuming", rak_id=rak_id, skipped=sorted(already_done))
+        # Reload findings from checkpoint for completed use cases
+        for uc, raw_findings in get_completed_findings(rak_id).items():
+            react_findings_per_use_case[uc] = [
+                Finding.model_validate(f) for f in raw_findings
+            ]
+            react_call_count += 1
+
     def _run_use_case(use_case_name: str, scoped: list[LogEvent]) -> tuple[str, list[Finding]]:
         findings = react_runner_fn(
             use_case=use_case_name,
@@ -92,10 +107,10 @@ def run_pipeline(
         )
         return use_case_name, findings
 
-    with ThreadPoolExecutor(max_workers=len(scoped_per_use_case)) as executor:
+    with ThreadPoolExecutor(max_workers=len(use_cases_to_run) or 1) as executor:
         futures = {
             executor.submit(_run_use_case, uc, scoped): uc
-            for uc, scoped in scoped_per_use_case.items()
+            for uc, scoped in use_cases_to_run.items()
         }
         for future in as_completed(futures):
             use_case_name, findings = future.result()
@@ -202,6 +217,7 @@ def run_pipeline(
     save_report(report)
     update_pipeline_state(rak_id, PipelineState.EMITTED,
                           notes=f"latency={pipeline_latency:.1f}s")
+    clear_checkpoint(rak_id)
 
     log.info("pipeline.complete", rak_id=rak_id,
              latency_seconds=round(pipeline_latency, 2),

@@ -31,10 +31,11 @@ from core.contracts import (
 )
 from core.formatting.pipe_formatter import format_events
 from core.logging_setup import log
-from core.analyzers.acp_client import KiroAcpSession
 from core.analyzers.kiro_client import extract_json
 from core.analyzers.prompt_loader import render_pass1_prompt
 from core.pass2 import tool_registry
+from core.react.checkpoint import mark_use_case_complete
+from core.react.retry import with_retries
 
 
 def _render_tool_catalog() -> str:
@@ -187,8 +188,13 @@ def run_react_session(
     rak_metadata: RAKMetadata,
     scoped_events: list[LogEvent],
     custom_overrides: list[dict[str, Any]],
+    backend_cls=None,
 ) -> list[Finding]:
     """Run a single stateful ReAct session for one use case."""
+    if backend_cls is None:
+        from core.analyzers.acp_client import KiroAcpSession
+        backend_cls = KiroAcpSession
+
     rak_id = rak_metadata.request_access_key
 
     if not scoped_events:
@@ -197,110 +203,113 @@ def run_react_session(
 
     log.info("react.start", use_case=use_case, rak_id=rak_id, event_count=len(scoped_events))
 
-    # Per-tool call counters
-    tool_call_counts: dict[str, int] = {}
-    start_time = time.time()
+    def _run_session() -> list[Finding]:
+        # Per-tool call counters
+        tool_call_counts: dict[str, int] = {}
+        start_time = time.time()
 
-    with KiroAcpSession(rak_id=rak_id, use_case=use_case) as session:
-        # Turn 1: inject system prompt + scoped context + tool catalog
-        initial_prompt = SYSTEM_PROMPT + "\n\n---\n\n" + _build_initial_prompt(
-            use_case=use_case,
-            rak_metadata=rak_metadata,
-            scoped_events=scoped_events,
-            custom_overrides=custom_overrides,
-        )
-        raw_response = session.send_message(initial_prompt, purpose=f"react.{use_case}.init", timeout=180)
+        with backend_cls(rak_id=rak_id, use_case=use_case) as session:
+            # Turn 1: inject system prompt + scoped context + tool catalog
+            initial_prompt = SYSTEM_PROMPT + "\n\n---\n\n" + _build_initial_prompt(
+                use_case=use_case,
+                rak_metadata=rak_metadata,
+                scoped_events=scoped_events,
+                custom_overrides=custom_overrides,
+            )
+            raw_response = session.send_message(initial_prompt, purpose=f"react.{use_case}.init", timeout=180).text
 
-        iteration = 0
-        while iteration < REACT_MAX_ITERATIONS:
-            # Check wall-clock
-            elapsed = time.time() - start_time
-            if elapsed > REACT_WALL_CLOCK_SECONDS:
-                log.warning("react.wall_clock_hit", use_case=use_case, rak_id=rak_id, elapsed=elapsed)
-                break
+            iteration = 0
+            while iteration < REACT_MAX_ITERATIONS:
+                # Check wall-clock
+                elapsed = time.time() - start_time
+                if elapsed > REACT_WALL_CLOCK_SECONDS:
+                    log.warning("react.wall_clock_hit", use_case=use_case, rak_id=rak_id, elapsed=elapsed)
+                    break
 
-            # Parse response
-            try:
-                payload = extract_json(raw_response)
-            except ValueError as e:
-                log.warning("react.parse_error", use_case=use_case, error=str(e)[:200])
-                # Ask LLM to fix — not counted as iteration
-                raw_response = session.send_message(
-                    f"Your previous response could not be parsed as JSON: {str(e)[:200]}\n"
-                    "Respond with ONLY a valid JSON object with an 'action' field.",
-                    purpose=f"react.{use_case}.parse_fix",
-                )
-                continue
-
-            action = payload.get("action")
-
-            if action == "final":
-                findings_list = payload.get("findings") or []
-                log.info("react.final", use_case=use_case, rak_id=rak_id,
-                         iteration=iteration, finding_count=len(findings_list))
-                return _findings_from_payload(findings_list, rak_id=rak_id, use_case=use_case)
-
-            elif action == "tool_call":
-                iteration += 1
-                tool_name = payload.get("tool", "")
-                args = payload.get("args") or {}
-
-                # Check per-tool cap
-                current_count = tool_call_counts.get(tool_name, 0)
-                if current_count >= REACT_MAX_PER_TOOL:
-                    # Inject error — NOT counted as iteration (undo the increment)
-                    iteration -= 1
+                # Parse response
+                try:
+                    payload = extract_json(raw_response)
+                except ValueError as e:
+                    log.warning("react.parse_error", use_case=use_case, error=str(e)[:200])
                     raw_response = session.send_message(
-                        json.dumps({
-                            "observation": f"TOOL BUDGET EXHAUSTED: You have already called '{tool_name}' "
-                            f"{REACT_MAX_PER_TOOL} times (maximum). Use a different tool or finalize."
-                        }),
-                        purpose=f"react.{use_case}.tool_cap",
-                    )
+                        f"Your previous response could not be parsed as JSON: {str(e)[:200]}\n"
+                        "Respond with ONLY a valid JSON object with an 'action' field.",
+                        purpose=f"react.{use_case}.parse_fix",
+                    ).text
                     continue
 
-                # Execute tool
-                try:
-                    result = _execute_tool_call(tool_name, args)
-                    tool_call_counts[tool_name] = current_count + 1
-                    log.info("react.tool_call", use_case=use_case, tool=tool_name,
-                             iteration=iteration, args=args)
-                    raw_response = session.send_message(
-                        json.dumps({"observation": result}),
-                        purpose=f"react.{use_case}.tool_result",
-                    )
-                except Exception as e:
-                    tool_call_counts[tool_name] = current_count + 1
-                    log.warning("react.tool_error", tool=tool_name, error=str(e))
-                    raw_response = session.send_message(
-                        json.dumps({"observation": f"TOOL ERROR: {e}"}),
-                        purpose=f"react.{use_case}.tool_error",
-                    )
-            else:
-                log.warning("react.unknown_action", action=action, use_case=use_case)
-                break
+                action = payload.get("action")
 
-        # 8th forced finalize turn
-        log.info("react.forcing_finalize", use_case=use_case, rak_id=rak_id)
-        raw_response = session.send_message(
-            "You have exhausted your investigation budget. You MUST finalize NOW. "
-            "Output your best findings based on everything you have gathered so far. "
-            'Respond with: {"action": "final", "findings": [...]}',
-            purpose=f"react.{use_case}.forced_final",
-            timeout=180,
-        )
+                if action == "final":
+                    findings_list = payload.get("findings") or []
+                    log.info("react.final", use_case=use_case, rak_id=rak_id,
+                             iteration=iteration, finding_count=len(findings_list))
+                    return _findings_from_payload(findings_list, rak_id=rak_id, use_case=use_case)
 
-        try:
-            payload = extract_json(raw_response)
-            findings_list = payload.get("findings") or []
-        except ValueError:
-            log.error("react.forced_final_parse_failed", use_case=use_case, rak_id=rak_id)
-            return []
+                elif action == "tool_call":
+                    iteration += 1
+                    tool_name = payload.get("tool", "")
+                    args = payload.get("args") or {}
 
-    elapsed_total = time.time() - start_time
-    log.info("react.complete", use_case=use_case, rak_id=rak_id,
-             elapsed_seconds=round(elapsed_total, 1),
-             finding_count=len(findings_list),
-             tool_calls=sum(tool_call_counts.values()))
+                    # Check per-tool cap
+                    current_count = tool_call_counts.get(tool_name, 0)
+                    if current_count >= REACT_MAX_PER_TOOL:
+                        iteration -= 1
+                        raw_response = session.send_message(
+                            json.dumps({
+                                "observation": f"TOOL BUDGET EXHAUSTED: You have already called '{tool_name}' "
+                                f"{REACT_MAX_PER_TOOL} times (maximum). Use a different tool or finalize."
+                            }),
+                            purpose=f"react.{use_case}.tool_cap",
+                        ).text
+                        continue
 
-    return _findings_from_payload(findings_list, rak_id=rak_id, use_case=use_case)
+                    # Execute tool
+                    try:
+                        result = _execute_tool_call(tool_name, args)
+                        tool_call_counts[tool_name] = current_count + 1
+                        log.info("react.tool_call", use_case=use_case, tool=tool_name,
+                                 iteration=iteration, args=args)
+                        raw_response = session.send_message(
+                            json.dumps({"observation": result}),
+                            purpose=f"react.{use_case}.tool_result",
+                        ).text
+                    except Exception as e:
+                        tool_call_counts[tool_name] = current_count + 1
+                        log.warning("react.tool_error", tool=tool_name, error=str(e))
+                        raw_response = session.send_message(
+                            json.dumps({"observation": f"TOOL ERROR: {e}"}),
+                            purpose=f"react.{use_case}.tool_error",
+                        ).text
+                else:
+                    log.warning("react.unknown_action", action=action, use_case=use_case)
+                    break
+
+            # 8th forced finalize turn
+            log.info("react.forcing_finalize", use_case=use_case, rak_id=rak_id)
+            raw_response = session.send_message(
+                "You have exhausted your investigation budget. You MUST finalize NOW. "
+                "Output your best findings based on everything you have gathered so far. "
+                'Respond with: {"action": "final", "findings": [...]}',
+                purpose=f"react.{use_case}.forced_final",
+                timeout=180,
+            ).text
+
+            try:
+                payload = extract_json(raw_response)
+                findings_list = payload.get("findings") or []
+            except ValueError:
+                log.error("react.forced_final_parse_failed", use_case=use_case, rak_id=rak_id)
+                return []
+
+        elapsed_total = time.time() - start_time
+        log.info("react.complete", use_case=use_case, rak_id=rak_id,
+                 elapsed_seconds=round(elapsed_total, 1),
+                 finding_count=len(findings_list),
+                 tool_calls=sum(tool_call_counts.values()))
+
+        return _findings_from_payload(findings_list, rak_id=rak_id, use_case=use_case)
+
+    findings = with_retries(_run_session, label=f"react.{use_case}")
+    mark_use_case_complete(rak_id, use_case, [f.model_dump(mode="json") for f in findings])
+    return findings

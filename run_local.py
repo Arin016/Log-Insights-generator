@@ -12,7 +12,6 @@ import sys
 from core.contracts import RAKMetadata
 from core.logging_setup import log
 from core.orchestrator.pipeline import run_pipeline
-from core.react.react_runner import run_react_session
 from core.pass2.event_store import ElasticsearchEventStore
 
 from applications.sap.catalogs import (
@@ -84,7 +83,6 @@ def main() -> int:
         use_case_configs=use_case_configs,
         custom_overrides=custom_overrides,
         register_tools_fn=register_sap_pass2_tools,
-        react_runner_fn=run_react_session,
     )
 
     # ─── Summary ────────────────────────────────────────────────────────
