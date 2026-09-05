@@ -39,3 +39,7 @@ data/manual_review/*.json
 
 # Elasticsearch data
 esdata/
+
+.pytest_cache/
+.runtime/
+artifacts/

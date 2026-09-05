@@ -1,0 +1,72 @@
+{
+  "synthetic": true,
+  "model": "scripted-not-an-LLM",
+  "baseline_commit": "2a3c28bec9b1f187af349767da7d4e74f6982d32",
+  "report": {
+    "rak_id": "synthetic-request-1",
+    "metadata": {
+      "request_access_key": "synthetic-request-1",
+      "application": "sap",
+      "actor": "synthetic-actor-1",
+      "requested_operations": [
+        "SE16"
+      ],
+      "session_ids": [
+        "synthetic-session-1"
+      ],
+      "rak_start": "2026-01-01T12:00:00",
+      "rak_end": "2026-01-01T12:00:00",
+      "total_event_count": 1
+    },
+    "findings_by_use_case": {
+      "vendor_master_manipulation": [
+        {
+          "finding_id": "f_d2ca1b638e04",
+          "rak_id": "synthetic-request-1",
+          "use_case": "vendor_master_manipulation",
+          "title": "Synthetic bank field changed",
+          "severity": "MEDIUM",
+          "confidence": 0.8,
+          "confidence_factors": {
+            "sufficient_context": true,
+            "unambiguous_evidence": true,
+            "pattern_clear": true,
+            "scope_unambiguous": true
+          },
+          "evidence_event_ids": [
+            "synthetic-event-1"
+          ],
+          "affected_session_ids": [
+            "synthetic-session-1"
+          ],
+          "reasoning": "Synthetic bank field changed from SYNTH-A to SYNTH-B.",
+          "pass_label": "pass_1",
+          "refined_from": null,
+          "prompt_version": "v1",
+          "model_id": "",
+          "created_at": "2026-09-05T14:33:20.702055"
+        }
+      ]
+    },
+    "report_metadata": {
+      "pipeline_version": "0.1.0",
+      "prompt_versions": {
+        "data_exfiltration": "v1",
+        "financial_fraud": "v1",
+        "logistics_fraud": "v1",
+        "po_manipulation": "v1",
+        "vendor_master_manipulation": "v1",
+        "so_manipulation": "v1"
+      },
+      "model_id": "claude-opus-4.6",
+      "pass1_invocations": 1,
+      "pass2_invocations": 0,
+      "total_bedrock_calls": 1,
+      "pipeline_latency_seconds": 0.0,
+      "cost_estimate_usd": 0.0,
+      "manual_review_count": 0
+    },
+    "raw_extras": {}
+  },
+  "limitations": "Legacy call/cost metadata is not trustworthy; this is control-flow smoke only."
+}

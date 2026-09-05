@@ -1,0 +1,23 @@
+....                                                                     [100%]
+=============================== warnings summary ===============================
+.venv/lib/python3.13/site-packages/pydantic/_internal/_config.py:323
+.venv/lib/python3.13/site-packages/pydantic/_internal/_config.py:323
+.venv/lib/python3.13/site-packages/pydantic/_internal/_config.py:323
+.venv/lib/python3.13/site-packages/pydantic/_internal/_config.py:323
+  /Users/arin.mallanna/personal/ff-insights-v2/.venv/lib/python3.13/site-packages/pydantic/_internal/_config.py:323: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warnings.warn(DEPRECATION_MESSAGE, DeprecationWarning)
+
+.venv/lib/python3.13/site-packages/pydantic/_internal/_generate_schema.py:298
+.venv/lib/python3.13/site-packages/pydantic/_internal/_generate_schema.py:298
+.venv/lib/python3.13/site-packages/pydantic/_internal/_generate_schema.py:298
+.venv/lib/python3.13/site-packages/pydantic/_internal/_generate_schema.py:298
+.venv/lib/python3.13/site-packages/pydantic/_internal/_generate_schema.py:298
+  /Users/arin.mallanna/personal/ff-insights-v2/.venv/lib/python3.13/site-packages/pydantic/_internal/_generate_schema.py:298: PydanticDeprecatedSince20: `json_encoders` is deprecated. See https://docs.pydantic.dev/2.11/concepts/serialization/#custom-serializers for alternatives. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/
+    warnings.warn(
+
+tests/test_baseline.py::test_existence_does_not_prove_support
+  /Users/arin.mallanna/personal/ff-insights-v2/.venv/lib/python3.13/site-packages/pydantic/main.py:253: DeprecationWarning: datetime.datetime.utcnow() is deprecated and scheduled for removal in a future version. Use timezone-aware objects to represent datetimes in UTC: datetime.datetime.now(datetime.UTC).
+    validated_self = self.__pydantic_validator__.validate_python(data, self_instance=self)
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+4 passed, 10 warnings in 0.79s
