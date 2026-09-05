@@ -15,7 +15,7 @@ from .gateway import Gateway, Capability, MemoryBackend, Query
 from .capsules import build_capsule
 from .control import Budgets, Meter, StateMachine, Exhausted, supervised
 from .ledger import RunLedger, code_identity
-from .models import ScriptedInvestigator, OllamaAdapter, ModelTurn, FIELDS, INVESTIGATOR_PROMPT, SEMANTIC_PROMPT
+from .models import ScriptedInvestigator, OllamaAdapter, ModelTurn, ProposalTurn, compile_proposals, FIELDS, INVESTIGATOR_PROMPT, SEMANTIC_PROMPT
 from .security import detect
 from .verification import verify_claim, contradiction_ids, semantic_payload, ScriptedSemanticVerifier, triage
 
@@ -40,6 +40,8 @@ class HarnessConfig(StrictModel):
     model: str = "scripted-investigator-2.0"
     verifier_model: str = "scripted-semantic-2.0"
     model_url: str = "http://127.0.0.1:11434"
+    model_digest: str | None = None
+    verifier_digest: str | None = None
 
 
 def load_hypothesis():
@@ -117,8 +119,8 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
             model=ScriptedInvestigator(tools=config.drill_down,fault=intervention.get("model_fault"))
             verifier=ScriptedSemanticVerifier()
         elif config.adapter=="ollama":
-            model=OllamaAdapter(config.model_url,config.model,config.budgets.wall_seconds)
-            verifier=OllamaAdapter(config.model_url,config.verifier_model,config.budgets.wall_seconds)
+            model=OllamaAdapter(config.model_url,config.model,config.budgets.wall_seconds,config.model_digest)
+            verifier=OllamaAdapter(config.model_url,config.verifier_model,config.budgets.wall_seconds,config.verifier_digest)
         else: raise ValueError("unknown model adapter")
         def model_call(payload,purpose,semantic=False):
             if config.adapter=="rules":
@@ -144,10 +146,15 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
         observation=None; purpose="initial_calls"
         while True:
             payload={"capsule":current.model_dump(mode="json"),"hypothesis":hypothesis.model_dump(mode="json"),
-                "query_schema":Query.model_json_schema(),"claim_schema":ModelTurn.model_json_schema(),
+                "query_schema":Query.model_json_schema(),"claim_schema":(ProposalTurn if config.adapter=="ollama" else ModelTurn).model_json_schema(),
+                "tools_allowed":config.drill_down,
                 "evidence_queries":{key:sorted(value) for key,value in retrieved.items()},"observation":observation}
             raw=model_call(payload,purpose)
-            try: turn=ModelTurn.model_validate_json(raw)
+            try:
+                if config.adapter=="ollama":
+                    turn=compile_proposals(ProposalTurn.model_validate_json(raw),snapshot,graph,retrieved,
+                                           config.model,config.graph)
+                else:turn=ModelTurn.model_validate_json(raw)
             except ValueError:
                 meter.charge("errors");meter.charge("repairs");purpose="repair_calls"
                 observation={"schema_error":"Return a valid ModelTurn object matching the supplied schema."}
@@ -231,11 +238,12 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
             "tokens_measured":config.adapter=="ollama","cost_usd":None}
     except (Exhausted,TimeoutError) as exc:
         machine.transition("EXPIRED")
-        return {"state":"EXPIRED","claims":[],"decisions":[],"partial":True,"counts":dict(meter.counts),"failure":str(exc)}
+        return {"state":"EXPIRED","claims":[],"decisions":[],"partial":True,"counts":dict(meter.counts),
+                "retrieved_event_ids":sorted(observed),"failure":str(exc)}
     except Exception as exc:
         machine.transition("FAILED")
         return {"state":"FAILED","claims":[],"decisions":[],"partial":True,"counts":dict(meter.counts),
-                "failure":type(exc).__name__+": "+str(exc)}
+                "retrieved_event_ids":sorted(observed),"failure":type(exc).__name__+": "+str(exc)}
 
 
 def run_case(snapshot,config,output_root,*,dataset_hash="unit-fixture",intervention=None,es=None,cancel=None,identity=None):
@@ -250,7 +258,7 @@ def run_case(snapshot,config,output_root,*,dataset_hash="unit-fixture",intervent
     ledger=RunLedger(output_root,manifest)
     inputs={"records":[json.loads(e.raw_json) for e in snapshot.events],"scope":snapshot.scope.model_dump(),
             "missing_sources":snapshot.missing_sources}
-    ledger.write("input.json",inputs)
+    ledger.write("input.json",inputs|{"deduplicated_source_rows":snapshot.duplicate_count})
     try:
         result=supervised(_execute,inputs|{"config":config.model_dump(mode="json"),"intervention":intervention or {},
             "es":es,"run_id":ledger.run_id},config.budgets.wall_seconds,ledger.append,cancel)

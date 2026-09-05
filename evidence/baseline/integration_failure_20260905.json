@@ -1,0 +1,11 @@
+{
+  "stage": "pre-evaluation development integration",
+  "code_commit": "c7d866c",
+  "test": "tests/test_elasticsearch.py::test_real_elasticsearch_roundtrip_and_pagination",
+  "result": "1 failed, 5 passed",
+  "failure": "elastic_transport.ConnectionTimeout during synthetic index creation after 5 seconds",
+  "root_cause_evidence": "Dedicated Elasticsearch console reported flood stage disk watermark [95%] exceeded, about 17.3 GB free, with unassigned primary shard and red cluster health.",
+  "scope": "newly created synthetic index only",
+  "followup": "Use explicit 5 GB / 3 GB / 2 GB free-space watermarks on the dedicated local cluster. Preserve the failed attempt. Verify cluster ownership before recovery.",
+  "approval_attempt": "First recovery escalation was rejected because automatic approval review hit the account usage limit. No recovery mutation was executed in that attempt."
+}

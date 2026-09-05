@@ -105,6 +105,7 @@ def supervised(target, kwargs, seconds, on_event, cancel=None):
         item={"kind":"state","state":terminal,"reason":"parent deadline/cancellation/worker failure"}
         events.append(item); on_event(item)
         result={"state":terminal,"claims":[],"decisions":[],"partial":True,"counts":counts,
+                "retrieved_event_ids":sorted({row["event_id"] for e in events if e["kind"]=="tool_result" for row in e["response"]["rows"]}),
                 "failures":[e for e in events if e["kind"]=="worker_failure"]}
     result["supervisor"]={"elapsed_seconds":time.monotonic()-start,
         "decision_seconds":decision_at-start,"cleanup_seconds":time.monotonic()-decision_at,

@@ -68,7 +68,11 @@ def verify_claim(claim: AtomicClaim, snapshot, graph, hypothesis, retrieved, *, 
             if not required_fields | extra <= set(ref.fields): failures.append("missing_evidence_fields")
         if graph_enabled and not graph.verified_path(claim.relationship_path, bank.event_id, payment.event_id):
             failures.append("relationship_path")
-        elif graph_enabled: checks.append("relationship_path")
+        elif graph_enabled:
+            edge_lookup={e.edge_id:e for e in graph.edges}
+            if any(eid not in retrieved for edge_id in claim.relationship_path for eid in edge_lookup[edge_id].source_events):
+                failures.append("unobserved_path_evidence")
+            else: checks.append("relationship_path")
         if claim.severity != "HIGH": failures.append("severity_policy")
     return Validation(valid=not failures, checks=tuple(sorted(set(checks))), failures=tuple(sorted(set(failures))))
 

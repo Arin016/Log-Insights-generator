@@ -9,6 +9,9 @@ services:
       xpack.ml.enabled: "false"
       ingest.geoip.downloader.enabled: "false"
       ES_JAVA_OPTS: -Xms512m -Xmx512m
+      cluster.routing.allocation.disk.watermark.low: 5gb
+      cluster.routing.allocation.disk.watermark.high: 3gb
+      cluster.routing.allocation.disk.watermark.flood_stage: 2gb
     ports:
       - "127.0.0.1:19200:9200"
     volumes:
