@@ -18,7 +18,7 @@ def _batch_query_tcodes(store: ElasticsearchEventStore, tcodes: list[str]) -> di
     results = {}
     for tcode in tcodes:
         data = store.by_tcode(tcode)
-        results[tcode] = {"total_count": data["total_count"], "events": data["events"]}
+        results[tcode] = data
     return {"tcodes_queried": tcodes, "results": results}
 
 
@@ -27,7 +27,7 @@ def _batch_query_tables(store: ElasticsearchEventStore, tables: list[str]) -> di
     results = {}
     for table in tables:
         data = store.by_table(table)
-        results[table] = {"total_count": data["total_count"], "events": data["events"]}
+        results[table] = data
     return {"tables_queried": tables, "results": results}
 
 
