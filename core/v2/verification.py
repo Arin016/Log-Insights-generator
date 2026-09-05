@@ -30,7 +30,7 @@ def verify_claim(claim: AtomicClaim, snapshot, graph, hypothesis, retrieved, *, 
         if ref.retrieved_by_query not in retrieved.get(ref.event_id, set()):
             failures.append("unobserved_evidence")
         for field, value_hash in zip(ref.fields, ref.value_hashes):
-            if field not in event.model_fields or field == "raw_json" or digest(getattr(event, field)) != value_hash:
+            if field not in type(event).model_fields or field == "raw_json" or digest(getattr(event, field)) != value_hash:
                 failures.append("field_integrity")
         if ref in claim.supporting_evidence:
             if ref.relation != "supports": failures.append("evidence_relation")
@@ -82,7 +82,7 @@ def contradiction_ids(claim, events):
     return tuple(e.event_id for e in related if
         (e.event_type == "APPROVAL" and e.occurred_at <= claim.start and bank is not None and bank.tcode in e.approved_operations)
         or (e.event_type == "REVERSAL" and e.occurred_at >= claim.end)
-        or (bank is not None and e.event_type == "BANK_CHANGE" and claim.start < e.occurred_at < claim.end
+        or (bank is not None and e.event_type == "BANK_CHANGE" and e.occurred_at < claim.end and e.event_id != bank.event_id
             and e.new_value == bank.old_value and e.old_value == bank.new_value))
 
 
