@@ -1,0 +1,21 @@
+{
+  "use_case": "vendor_bank_change_payment",
+  "version": "2.0.0",
+  "owner": "public-synthetic-research",
+  "objective": "Identify a changed bank field outside explicit synthetic authorization followed by a completed payment for the same vendor, actor and session within one hour.",
+  "non_objectives": ["infer fraud or intent", "general SAP authorization interpretation", "cross-session delegation", "other legacy use-case families"],
+  "allowed_sources": ["synthetic_audit", "synthetic_policy"],
+  "seed_predicates": ["event_type=BANK_CHANGE"],
+  "required_checks": ["approved_scope", "identity", "temporal", "domain", "integrity", "contradiction_search", "query_completeness", "source_completeness", "semantic_support"],
+  "optional_checks": ["invoice_context"],
+  "minimum_evidence": ["changed_bank_field", "completed_payment", "same_actor_session_object", "verified_path"],
+  "benign_explanations": ["explicit authorized maintenance", "bank rollback before payment", "payment reversal", "different object or actor", "payment still pending"],
+  "contradiction_queries": ["contradictions_by_object"],
+  "termination_criteria": ["all mandatory checks pass", "budget or deadline exceeded", "unsafe input detected"],
+  "abstention_criteria": ["missing source", "unresolved truncation", "insufficient support", "unresolved contradiction"],
+  "severity_policy": "synthetic-priority-2.0: HIGH for this bounded pattern; never a probability",
+  "bank_tables": ["LFBK", "BPBK"],
+  "bank_fields": ["BANKN", "BANKL"],
+  "payment_tcodes": ["F110", "F-53"],
+  "window_seconds": 3600
+}
