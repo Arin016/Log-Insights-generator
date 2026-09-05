@@ -98,7 +98,7 @@ class OllamaAdapter:
         if not model: raise ValueError("explicit model required")
         self.url=url.rstrip("/");self.model_version=model;self.timeout=timeout
     def _call(self,payload,system,schema):
-        body={"model":self.model_version,"stream":False,"format":schema,
+        body={"model":self.model_version,"stream":False,"think":False,"format":schema,
               "options":{"temperature":0,"seed":20260905,"num_predict":2048},
               "messages":[{"role":"system","content":system},{"role":"user","content":canonical_json(payload)}]}
         req=Request(self.url+"/api/chat",data=canonical_json(body).encode(),headers={"Content-Type":"application/json"})

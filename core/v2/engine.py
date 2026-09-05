@@ -113,7 +113,7 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
             return cap
         current=capsule(initial_events)
         machine.transition("CAPSULE_READY"); machine.transition("INVESTIGATING")
-        if config.adapter=="scripted":
+        if config.adapter in {"scripted","rules"}:
             model=ScriptedInvestigator(tools=config.drill_down,fault=intervention.get("model_fault"))
             verifier=ScriptedSemanticVerifier()
         elif config.adapter=="ollama":
@@ -121,6 +121,9 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
             verifier=OllamaAdapter(config.model_url,config.verifier_model,config.budgets.wall_seconds)
         else: raise ValueError("unknown model adapter")
         def model_call(payload,purpose,semantic=False):
+            if config.adapter=="rules":
+                meter.charge("rule_evaluations")
+                return model.respond(payload)[0]
             meter.charge("model_calls");meter.charge(purpose)
             size=len(canonical_json(payload).encode())
             # Conservative UTF-8-byte reservation; never presented as measured tokenizer usage.
@@ -225,7 +228,7 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
             "structural":[v.model_dump() for v in validations],"semantic":[v.model_dump() for v in semantic_results],
             "retrieved_event_ids":sorted(observed),"graph":graph.model_dump(mode="json") if config.graph else None,
             "partial":bool(incomplete or snapshot.missing_sources),"counts":dict(meter.counts),
-            "tokens_measured":config.adapter!="scripted","cost_usd":None}
+            "tokens_measured":config.adapter=="ollama","cost_usd":None}
     except (Exhausted,TimeoutError) as exc:
         machine.transition("EXPIRED")
         return {"state":"EXPIRED","claims":[],"decisions":[],"partial":True,"counts":dict(meter.counts),"failure":str(exc)}
@@ -242,7 +245,7 @@ def run_case(snapshot,config,output_root,*,dataset_hash="unit-fixture",intervent
         "prompt_hashes":{"investigator":digest(INVESTIGATOR_PROMPT),"semantic":digest(SEMANTIC_PROMPT)},
         "tool_schema":Query.model_json_schema(),"config":config.model_dump(mode="json"),"es":es,
         "model":{"provider":config.adapter,"version":config.model,"verifier":config.verifier_model,
-                 "decoding":{"temperature":0,"seed":20260905},"scripted_only":config.adapter=="scripted"},
+                 "decoding":{"temperature":0,"seed":20260905},"scripted_only":config.adapter in {"scripted","rules"}},
         "disclosure":"newly-generated-synthetic-only","intervention":intervention or {}}
     ledger=RunLedger(output_root,manifest)
     inputs={"records":[json.loads(e.raw_json) for e in snapshot.events],"scope":snapshot.scope.model_dump(),

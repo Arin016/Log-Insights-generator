@@ -74,4 +74,19 @@ def apply_use_case_filter(
             f"Use case {use_case_config.get('use_case')!r} has empty scope_filter.match_any"
         )
 
+    # Validate the whole configuration before matching; short-circuiting must not
+    # hide an unknown or empty rule, including when no input events exist.
+    keys = {"operation_category_in", "operation_matches", "entity_classification_in",
+            "entity_matches", "action_type_in", "attributes_audit_class_in",
+            "attributes_log_type_in", "deviation_flagged"}
+    for rule in rules:
+        if not isinstance(rule, dict) or not rule or set(rule) - keys:
+            raise ValueError("Unknown or empty scope filter rule")
+        for key, value in rule.items():
+            if key == "deviation_flagged":
+                if type(value) is not bool:
+                    raise ValueError("deviation_flagged requires a boolean")
+            elif not isinstance(value, list) or not value or not all(isinstance(v, str) for v in value):
+                raise ValueError("scope filter requires a nonempty string list")
+
     return [e for e in events if any(_event_matches_rule(e, r) for r in rules)]

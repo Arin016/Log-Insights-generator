@@ -7,7 +7,7 @@ This is the only file in the system that knows about SAP's raw log format.
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Iterable
 
@@ -56,13 +56,14 @@ CHANGE_INDICATOR_TO_ACTION: dict[str, ActionType] = {
 def _parse_timestamp(s: str) -> datetime:
     """SAP timestamps come as YYYYMMDDHHMMSS."""
     s = s.strip()
-    return datetime.strptime(s, "%Y%m%d%H%M%S")
+    return datetime.strptime(s, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
 
 
 def _parse_change_log_details(details: str) -> dict:
     """CHANGE LOG details field is JSON. Returns {} on parse failure."""
     try:
-        return json.loads(details)
+        parsed = json.loads(details)
+        return parsed if isinstance(parsed, dict) else {}
     except (json.JSONDecodeError, TypeError):
         return {}
 
@@ -83,11 +84,12 @@ def parse_log_line(line: str) -> LogEvent | None:
     if not line.strip() or line.startswith("LOGID|"):
         return None  # skip header / blanks
 
-    parts = line.split("|")
-    # Pad if too few fields
-    while len(parts) < len(PIPE_FIELDS):
-        parts.append("")
+    parts = line.split("|", len(PIPE_FIELDS) - 1)
+    if len(parts) != len(PIPE_FIELDS):
+        return None
     raw = dict(zip(PIPE_FIELDS, parts))
+    if any(not raw[k].strip() for k in ("log_id", "request_id", "session_id", "ff_id")):
+        return None
 
     log_type = (raw.get("log_type") or "").strip()
     transaction_code = _strip_or_none(raw.get("transaction_code"))
