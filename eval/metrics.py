@@ -5,6 +5,7 @@ from collections import Counter,defaultdict
 import math
 import random
 import json
+from statistics import median
 
 
 def attack_outcome(report,label,trace_path):
@@ -161,8 +162,8 @@ def aggregate(rows,bootstrap_samples=400):
     return {"cases":len(rows),"independent_generated_families":len(groups),"metrics":aggregates,
         "confusion":{"tp":sum(r["tp"] for r in rows),"fp":sum(r["fp"] for r in rows),"fn":sum(r["fn"] for r in rows)},
         "states":dict(Counter(r["state"] for r in rows)),"resource_totals":dict(counts),
-        "latency_seconds":{"median":latencies[len(latencies)//2] if latencies else None,
-                           "p95":latencies[int(.95*(len(latencies)-1))] if latencies else None},
+        "latency_seconds":{"median":median(latencies) if latencies else None,
+                           "p95":latencies[math.ceil(.95*len(latencies))-1] if latencies else None},
         "measured_model_tokens":({"input":counts["input_tokens"],"output":counts["output_tokens"],
             "calls_with_reported_usage":counts["usage_reported_calls"],"attempted_calls":counts["model_calls"],
             "complete":counts["usage_reported_calls"]==counts["model_calls"]} if counts["usage_reported_calls"] else None),

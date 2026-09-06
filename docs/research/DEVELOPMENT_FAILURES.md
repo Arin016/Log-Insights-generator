@@ -9,3 +9,7 @@ At commit a9579c3, development-only runs `dev-memory-1` (414 case-runs) and `dev
 - Typed edges now use compact source-linked tuples; hybrid preserves full node/edge objects. Token totals are reported only for provider-returned usage, with usage coverage across attempted calls.
 
 All changes were motivated by development evidence. Final test and challenge runs have not been inspected or used for tuning at this checkpoint.
+
+The second live pilot (05b7872; six runs) produced valid JSON but no surfaced claims. It also attempted object lookups using table/transaction text instead of the observed object ID. The third pilot (9570975; six runs) removed duplicated schemas and JSON-string nesting from provider input, pinned a 32,768-token context, and enforced a conservative byte-based prompt/context limit. It still abstained in all six positive-case runs. This is a model/harness failure retained for reporting, not a reason to tune on held-out data.
+
+The final protocol uses a fresh seed (20260906) and three independently generated sibling families: one development, one test and one challenge family, with 23 variants each. All 19 configurations run on both held-out families for each of the scripted and installed local-model tuples. This is deliberately a small local feasibility study; two held-out families cannot support a publishable effectiveness or generalization claim. Test/challenge summaries are reported separately as well as pooled. No policy or prompt changes will follow inspection of final outcomes.

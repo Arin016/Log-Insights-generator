@@ -112,6 +112,9 @@ def evaluate(dataset,protocol_path,output,*,splits=("development",),names=None,e
             summaries[config.name]=aggregate(rows)
             print(canonical_json({"configuration":config.name,"cases":len(rows),"states":summaries[config.name]["states"]}),flush=True)
     (out/"summary.json").write_text(canonical_json(summaries)+"\n")
+    split_summaries={split:{config.name:aggregate([r for r in allrows if r["split"]==split and r["configuration"]==config.name])
+                            for config in configs} for split in splits}
+    (out/"summary-by-split.json").write_text(canonical_json(split_summaries)+"\n")
     with (out/"table.csv").open("x",newline="") as f:
         writer=csv.writer(f);writer.writerow(["configuration","metric","numerator","denominator","value","family_bootstrap_95_interval"])
         for config,summary in summaries.items():
