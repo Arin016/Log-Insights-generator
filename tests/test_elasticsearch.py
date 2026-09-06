@@ -37,3 +37,12 @@ def test_real_elasticsearch_roundtrip_and_pagination(tmp_path):
                 if not response["truncated"]:break
                 query["cursor"]=response["next_cursor"]
             assert set(found)==set(ids)
+    from core.v2.engine import run_case,HarnessConfig
+    from core.v2.ledger import verify_ledger
+    for category in ("positive","multihop","conflicting","missing_source"):
+        item=next(c for c in manifest["cases"] if c["category"]==category)
+        s=load_case(corpus,item["case_id"])
+        report,path=run_case(s,HarnessConfig(),tmp_path/"runs",es={"url":seeded["url"],"index":seeded["index"]})
+        expected="HUMAN_REVIEW_REQUIRED" if category=="missing_source" else "ABSTAINED" if category=="conflicting" else "SURFACE_TO_ANALYST"
+        assert report["state"]==expected
+        assert verify_ledger(path)

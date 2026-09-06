@@ -51,7 +51,7 @@ def freeze(dataset,destination,*,live_model=None,model_digest=None,wall_seconds=
         "dataset_hash":manifest["dataset_hash"],"configurations":configs,
         "split_policy":"Complete generated sibling families stay together. Challenge consumed once after protocol freeze.",
         "label_provenance":"Generator-authored, no independent domain experts or real logs.",
-        "metric_version":"synthetic-oracle-2.0","bootstrap":"400 resamples of complete generated families",
+        "metric_version":"synthetic-oracle-2.1","bootstrap":"400 resamples of complete generated families",
         "model_evaluation":"LOCAL_OLLAMA_SYNTHETIC" if live_model else "SCRIPTED_HARNESS_ONLY; not LLM effectiveness",
         "fault_deadline_seconds":.5,
         "primary_metrics":["atomic_claim_precision","atomic_claim_recall","disposition_accuracy","review_volume","selective_risk"],

@@ -6,8 +6,8 @@ from .contracts import StrictModel, canonical_json, digest
 from .graph import build_graph
 
 
-REPRESENTATIONS = ("raw", "pipe", "typed_json", "typed_edges", "hybrid")
-PIPE_FIELDS = ("event_id", "session", "actor", "occurred_at", "event_type", "tcode", "table",
+REPRESENTATIONS = ("raw", "legacy_pipe", "pipe", "typed_json", "typed_edges", "hybrid")
+PIPE_FIELDS = ("event_id", "raw_content_hash", "session", "actor", "occurred_at", "event_type", "tcode", "table",
                "object_id", "field", "old_value", "new_value", "approved_operations", "status", "text")
 
 
@@ -37,6 +37,17 @@ def serialize(events, graph, representation, defenses=True):
     if representation == "raw":
         # Raw source remains untrusted and contains all original source fields.
         data = [json.loads(event.raw_json) | {"event_id":event.event_id} for event in events]
+    elif representation == "legacy_pipe":
+        from datetime import datetime
+        from core.contracts import LogEvent
+        from core.formatting.pipe_formatter import format_events
+        legacy=[LogEvent(event_id=e.event_id,request_access_key=e.request,session_id=e.session,
+            timestamp_utc=datetime.fromisoformat(e.occurred_at),actor=e.actor,operation=e.tcode,
+            entity_accessed=e.table,action_type="UPDATE" if e.event_type=="BANK_CHANGE" else "EXECUTE",
+            deviation_flagged=e.tcode not in e.approved_operations,
+            attributes={"log_type":"SM20 LOG","field":e.field,"old_val":e.old_value,"new_val":e.new_value,
+                        "raw_details":e.text if not defenses else ""}) for e in events]
+        data={"format":"original-core-formatting-pipe_formatter","table":format_events(legacy)}
     elif representation == "pipe":
         out = io.StringIO()
         writer = csv.writer(out, delimiter="|", lineterminator="\n")
@@ -45,6 +56,12 @@ def serialize(events, graph, representation, defenses=True):
             writer.writerow(canonical_json(row.get(k, "")) for k in PIPE_FIELDS)
         data = {"format":"quoted-pipe-json-cells-2.0", "table":out.getvalue()}
     elif representation == "typed_json": data = rows
+    elif representation == "typed_edges":
+        # Compact source-linked edge tuples; hybrid retains fully typed graph objects.
+        nodes = {n.node_id:n for n in graph.nodes}
+        data = {"events":rows, "edge_columns":["edge_id","relation","source_event","target_kind","target_value","evidence_ids"],
+                "edges":[[e.edge_id,e.kind,nodes[e.source].value,nodes[e.target].kind,
+                          nodes[e.target].value,list(e.source_events)] for e in graph.edges]}
     else:
         data = {"events":rows, "graph":graph.model_dump(mode="json")}
     return canonical_json({"trust_label":"UNTRUSTED_LOG_DATA", "representation":representation, "data":data})
@@ -81,6 +98,9 @@ def decode_capsule(capsule):
     """Scripted investigator parses the actual selected representation, never labels."""
     envelope = json.loads(capsule.serialized_evidence)
     data = envelope["data"]
+    if capsule.representation == "legacy_pipe":
+        # Preserve actual legacy information loss. No hidden identity/object backfill.
+        return list(csv.DictReader(io.StringIO(data["table"]),delimiter="|"))
     if capsule.representation == "pipe":
         return [{k:json.loads(v) for k,v in row.items()}
                 for row in csv.DictReader(io.StringIO(data["table"]), delimiter="|")]

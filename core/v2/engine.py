@@ -15,7 +15,7 @@ from .gateway import Gateway, Capability, MemoryBackend, Query
 from .capsules import build_capsule
 from .control import Budgets, Meter, StateMachine, Exhausted, supervised
 from .ledger import RunLedger, code_identity
-from .models import ScriptedInvestigator, OllamaAdapter, ModelTurn, ProposalTurn, compile_proposals, FIELDS, INVESTIGATOR_PROMPT, SEMANTIC_PROMPT
+from .models import ScriptedInvestigator, OllamaAdapter, ModelTurn, ProposalTurn, compile_proposals, proposal_schema, FIELDS, INVESTIGATOR_PROMPT, SEMANTIC_PROMPT
 from .security import detect
 from .verification import verify_claim, contradiction_ids, semantic_payload, ScriptedSemanticVerifier, triage
 
@@ -105,7 +105,7 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
         for i in range(0,len(initial),32):
             fetched,incomplete=pages({"template":"events_by_ids","event_ids":[e.event_id for e in initial[i:i+32]]},"initial_queries")
             initial_events.extend(fetched);initial_incomplete |= incomplete
-        graph=build_graph(snapshot)
+        graph=build_graph(snapshot, None if config.graph else [])
         def capsule(events):
             cap=build_capsule(snapshot,hypothesis,events,representation=config.representation,
                 row_budget=config.capsule_rows,byte_budget=config.capsule_bytes,token_budget=config.capsule_bytes,
@@ -139,6 +139,8 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
             meter.charge("model_output_bytes",output_size)
             if output_size>config.budgets.output_bytes_per_call: raise Exhausted("model_output_bytes")
             if usage:
+                if all(usage.get(key) is not None for key in ("input_tokens","output_tokens")):
+                    meter.charge("usage_reported_calls")
                 for key in ("input_tokens","output_tokens"):
                     if usage.get(key) is not None: meter.charge(key,usage[key])
             emit({"kind":"model_response","purpose":purpose,"output":raw,"usage":usage})
@@ -146,7 +148,7 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
         observation=None; purpose="initial_calls"
         while True:
             payload={"capsule":current.model_dump(mode="json"),"hypothesis":hypothesis.model_dump(mode="json"),
-                "query_schema":Query.model_json_schema(),"claim_schema":(ProposalTurn if config.adapter=="ollama" else ModelTurn).model_json_schema(),
+                "query_schema":Query.model_json_schema(),"claim_schema":proposal_schema(config.drill_down) if config.adapter=="ollama" else ModelTurn.model_json_schema(),
                 "tools_allowed":config.drill_down,
                 "evidence_queries":{key:sorted(value) for key,value in retrieved.items()},"observation":observation}
             raw=model_call(payload,purpose)
@@ -155,9 +157,13 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
                     turn=compile_proposals(ProposalTurn.model_validate_json(raw),snapshot,graph,retrieved,
                                            config.model,config.graph)
                 else:turn=ModelTurn.model_validate_json(raw)
-            except ValueError:
+            except ValueError as exc:
+                # Validation detail is observable; do not include private model reasoning.
+                detail=exc.errors(include_input=False,include_url=False) if hasattr(exc,"errors") else [{"msg":str(exc)}]
+                detail=[{"loc":list(e.get("loc",())),"msg":e["msg"],"type":e.get("type","value_error")} for e in detail]
+                emit({"kind":"schema_error","errors":detail})
                 meter.charge("errors");meter.charge("repairs");purpose="repair_calls"
-                observation={"schema_error":"Return a valid ModelTurn object matching the supplied schema."}
+                observation={"schema_error":"Return a valid object matching claim_schema; final requires query null.","errors":detail}
                 continue
             if turn.action=="final":
                 meter.charge("finalization_calls");claims=list(turn.claims);break
@@ -221,11 +227,11 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
             else:
                 state,reasons=triage(val,sem,checks=checks,required_checks=required,
                     contradictions=contradiction,missing=snapshot.missing_sources if config.coverage else (),
-                    truncated=incomplete,selective=config.selective,semantic_enabled=config.semantic)
+                    truncated=incomplete if config.coverage else False,selective=config.selective,semantic_enabled=config.semantic)
             decisions.append({"claim_id":claim.claim_id,"state":state,"reasons":reasons,
                               "checks":sorted(checks),"support_label":sem.label,"severity":claim.severity})
         machine.transition("POLICY_DECISION")
-        if incomplete or snapshot.missing_sources:
+        if config.coverage and (incomplete or snapshot.missing_sources):
             state="HUMAN_REVIEW_REQUIRED"
         elif any(d["state"]=="HUMAN_REVIEW_REQUIRED" for d in decisions):state="HUMAN_REVIEW_REQUIRED"
         elif any(d["state"]=="SURFACE_TO_ANALYST" for d in decisions):state="SURFACE_TO_ANALYST"
@@ -253,7 +259,9 @@ def run_case(snapshot,config,output_root,*,dataset_hash="unit-fixture",intervent
         "prompt_hashes":{"investigator":digest(INVESTIGATOR_PROMPT),"semantic":digest(SEMANTIC_PROMPT)},
         "tool_schema":Query.model_json_schema(),"config":config.model_dump(mode="json"),"es":es,
         "model":{"provider":config.adapter,"version":config.model,"verifier":config.verifier_model,
-                 "decoding":{"temperature":0,"seed":20260905},"scripted_only":config.adapter in {"scripted","rules"}},
+                 "decoding":{"temperature":0,"seed":20260905,"num_predict":2048,"think":False},
+                 "digest":config.model_digest,"verifier_digest":config.verifier_digest,
+                 "scripted_only":config.adapter in {"scripted","rules"}},
         "disclosure":"newly-generated-synthetic-only","intervention":intervention or {}}
     ledger=RunLedger(output_root,manifest)
     inputs={"records":[json.loads(e.raw_json) for e in snapshot.events],"scope":snapshot.scope.model_dump(),

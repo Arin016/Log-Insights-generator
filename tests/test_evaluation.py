@@ -10,6 +10,26 @@ from eval.synthetic import generate
 from tests.test_engine import generated
 
 
+@pytest.mark.parametrize("representation",["raw","pipe","typed_json","typed_edges","hybrid"])
+def test_representation_preserves_real_investigation(representation):
+    s,label,intervention=generated("positive")
+    config=HarnessConfig(representation=representation)
+    report=_execute([json.loads(e.raw_json) for e in s.events],s.scope.model_dump(),s.missing_sources,
+        config.model_dump(),intervention,None,"test",lambda _:None)
+    report["supervisor"]={"elapsed_seconds":0}
+    assert report["state"]=="SURFACE_TO_ANALYST"
+    metrics=case_metrics(report,label,s)["metrics"]
+    assert metrics["path_recall"]==ratio(1,1)
+    assert metrics["claim_edge_recall"]["value"]==1
+
+
+def test_usage_totals_are_measured_only_when_reported():
+    row={"group_id":"g","metrics":{},"tp":0,"fp":0,"fn":0,"state":"EXPIRED","latency_seconds":1,
+         "counts":{"input_tokens":100,"output_tokens":10,"model_calls":2,"usage_reported_calls":1}}
+    measured=aggregate([row])["measured_model_tokens"]
+    assert measured["input"]==100 and measured["output"]==10 and not measured["complete"]
+
+
 def test_metric_denominators_and_false_positive():
     s,label,intervention=generated("authorized")
     config=next(c for c in configurations() if c.name=="rules")
@@ -25,7 +45,7 @@ def test_metric_denominators_and_false_positive():
 
 def test_configs_cover_requirements():
     configs={c.name:c for c in configurations()}
-    assert len(configs)==18
+    assert len(configs)==19
     assert configs["naive_single_pass"].drill_down is False
     assert configs["demo_style_react"].verification=="existence"
     assert configs["v2_no_graph"].graph is False

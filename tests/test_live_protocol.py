@@ -1,4 +1,4 @@
-from core.v2.models import Proposal,ProposalTurn,compile_proposals
+from core.v2.models import Proposal,ProposalTurn,compile_proposals,proposal_schema
 from core.v2.graph import build_graph
 from core.v2.verification import verify_claim
 from tests.test_graph_capsules import chain,hypothesis
@@ -21,3 +21,11 @@ def test_compiler_does_not_promote_unobserved_graph_evidence():
     observed={e.event_id:{"q-1"} for e in (bank,payment)}
     claim=compile_proposals(ProposalTurn(action="final",proposals=(p,)),s,build_graph(s),observed,"local-test").claims[0]
     assert "unobserved_path_evidence" in verify_claim(claim,s,build_graph(s),hypothesis(),observed).failures
+
+
+def test_live_grammar_encodes_final_query_null():
+    schema=proposal_schema(False)
+    assert schema["properties"]["action"]["const"]=="final"
+    assert schema["properties"]["query"]=={"type":"null"}
+    branches=proposal_schema(True)["anyOf"]
+    assert branches[0]["properties"]["proposals"]["maxItems"]==0
