@@ -37,7 +37,8 @@ def checked_manifest(dataset):
     return manifest
 
 
-def freeze(dataset,destination,*,live_model=None,model_digest=None,wall_seconds=60):
+def freeze(dataset,destination,*,live_model=None,model_digest=None,wall_seconds=60,
+           claude_model=None,verifier_model=None,spending_ledger=None):
     manifest=checked_manifest(dataset)
     configs=[c.model_dump(mode="json") for c in configurations()]
     if live_model:
@@ -47,15 +48,34 @@ def freeze(dataset,destination,*,live_model=None,model_digest=None,wall_seconds=
             config.update(adapter="ollama",model=live_model,verifier_model=live_model,
                           model_digest=model_digest,verifier_digest=model_digest)
             config["budgets"]["wall_seconds"]=wall_seconds
+    if claude_model:
+        from core.v2.anthropic_adapter import MODEL_RATES
+        from core.v2.spending import SpendingLedger
+        if live_model:raise ValueError("choose one provider")
+        if claude_model not in MODEL_RATES or (verifier_model or claude_model) not in MODEL_RATES:
+            raise ValueError("Claude model not in verified pricing registry")
+        SpendingLedger(spending_ledger).snapshot()
+        for config in configs:
+            if config["adapter"]=="rules":continue
+            config.update(adapter="anthropic",model=claude_model,verifier_model=verifier_model or claude_model,
+                          spending_ledger=str(Path(spending_ledger).resolve()))
+            config["budgets"]["wall_seconds"]=wall_seconds
     protocol={"version":"2.0.0","created_at":utcnow(),"code":code_identity(),"source_hashes":source_hashes(),
         "dataset_hash":manifest["dataset_hash"],"configurations":configs,
         "split_policy":"Complete generated sibling families stay together. Challenge consumed once after protocol freeze.",
         "label_provenance":"Generator-authored, no independent domain experts or real logs.",
         "metric_version":"synthetic-oracle-2.1","bootstrap":"400 resamples of complete generated families",
-        "model_evaluation":"LOCAL_OLLAMA_SYNTHETIC" if live_model else "SCRIPTED_HARNESS_ONLY; not LLM effectiveness",
+        "model_evaluation":"CLAUDE_PAID_DEVELOPMENT_PILOT" if claude_model else "LOCAL_OLLAMA_SYNTHETIC" if live_model else "SCRIPTED_HARNESS_ONLY; not LLM effectiveness",
+        "paid_pilot_only":bool(claude_model),
         "fault_deadline_seconds":.5,
         "primary_metrics":["atomic_claim_precision","atomic_claim_recall","disposition_accuracy","review_volume","selective_risk"],
         "change_policy":"Do not tune against test/challenge failures. Preserve failure runs; a changed protocol requires a new corpus."}
+    if claude_model:
+        from core.v2.anthropic_adapter import MODEL_RATES,PRICE_SOURCE
+        protocol["billing"]={"rates_microusd_per_token":MODEL_RATES,"source":PRICE_SOURCE,
+            "price_verified_at":"2026-09-06","ledger":str(Path(spending_ledger).resolve()),
+            "limit_microusd":SpendingLedger(spending_ledger).snapshot()["limit_microusd"],
+            "policy":"Reserve full model input capacity and maximum output before every call. Ambiguous calls retain reservation."}
     protocol["protocol_hash"]=digest(protocol)
     with Path(destination).open("x") as f:f.write(canonical_json(protocol)+"\n")
     return protocol
@@ -75,6 +95,8 @@ def evaluate(dataset,protocol_path,output,*,splits=("development",),names=None,e
         if set(splits)!={"development"}:raise ValueError("case limits allowed only for development")
         cases=cases[:limit]
     configs=[HarnessConfig.model_validate(c) for c in protocol["configurations"] if not names or c["name"] in names]
+    if protocol.get("paid_pilot_only") and (set(splits)!={"development"} or limit is None or not 1<=limit<=23):
+        raise ValueError("paid pilot requires development split and explicit limit of 1..23 cases")
     if not cases or not configs:raise ValueError("empty experiment")
     out=Path(output);out.mkdir(parents=True,exist_ok=False)
     (out/"protocol.json").write_text(canonical_json(protocol)+"\n")
@@ -139,8 +161,10 @@ def main():
     p.add_argument("--configs");p.add_argument("--workers",type=int,default=2);p.add_argument("--limit",type=int)
     p.add_argument("--es-index");p.add_argument("--es-url",default="http://127.0.0.1:19200")
     p.add_argument("--live-local-model");p.add_argument("--model-digest");p.add_argument("--wall-seconds",type=float,default=60)
+    p.add_argument("--claude-model");p.add_argument("--verifier-model");p.add_argument("--spending-ledger")
     a=p.parse_args()
-    if a.command=="freeze":print(freeze(a.dataset,a.protocol,live_model=a.live_local_model,model_digest=a.model_digest,wall_seconds=a.wall_seconds)["protocol_hash"])
+    if a.command=="freeze":print(freeze(a.dataset,a.protocol,live_model=a.live_local_model,model_digest=a.model_digest,wall_seconds=a.wall_seconds,
+        claude_model=a.claude_model,verifier_model=a.verifier_model,spending_ledger=a.spending_ledger)["protocol_hash"])
     else:
         if not a.output:p.error("--output required")
         if not 1<=a.workers<=4:p.error("workers must be 1..4")

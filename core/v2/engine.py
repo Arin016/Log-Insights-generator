@@ -42,6 +42,7 @@ class HarnessConfig(StrictModel):
     model_url: str = "http://127.0.0.1:11434"
     model_digest: str | None = None
     verifier_digest: str | None = None
+    spending_ledger: str | None = None
 
 
 def load_hypothesis():
@@ -121,6 +122,10 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
         elif config.adapter=="ollama":
             model=OllamaAdapter(config.model_url,config.model,config.budgets.wall_seconds,config.model_digest)
             verifier=OllamaAdapter(config.model_url,config.verifier_model,config.budgets.wall_seconds,config.verifier_digest)
+        elif config.adapter=="anthropic":
+            from .anthropic_adapter import ClaudeAdapter
+            model=ClaudeAdapter(config.model,config.budgets.wall_seconds,config.spending_ledger,run_id)
+            verifier=ClaudeAdapter(config.verifier_model,config.budgets.wall_seconds,config.spending_ledger,run_id)
         else: raise ValueError("unknown model adapter")
         def model_call(payload,purpose,semantic=False):
             if config.adapter=="rules":
@@ -131,7 +136,7 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
             # Conservative UTF-8-byte reservation; never presented as measured tokenizer usage.
             meter.charge("token_upper_bound",size+config.budgets.output_bytes_per_call)
             emit({"kind":"model_request","purpose":purpose,"payload":payload,
-                  "provider_payload":local_payload(payload) if config.adapter=="ollama" else None})
+                  "provider_payload":local_payload(payload) if config.adapter in {"ollama","anthropic"} else None})
             if semantic and config.adapter=="scripted":
                 raw=verifier.verify(payload).model_dump_json();usage=None
             elif semantic: raw,usage=verifier.semantic(payload)
@@ -144,17 +149,20 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
                     meter.charge("usage_reported_calls")
                 for key in ("input_tokens","output_tokens"):
                     if usage.get(key) is not None: meter.charge(key,usage[key])
+                if usage.get("cost_microusd") is not None:meter.charge("cost_microusd",usage["cost_microusd"])
             emit({"kind":"model_response","purpose":purpose,"output":raw,"usage":usage})
+            if config.adapter=="anthropic" and usage and (usage["stop_reason"]!="end_turn" or usage["provider_model"] not in {config.model,config.verifier_model}):
+                raise ValueError("Claude incomplete/refused response or unexpected model; usage recorded")
             return raw
         observation=None; purpose="initial_calls"
         while True:
             payload={"capsule":current.model_dump(mode="json"),"hypothesis":hypothesis.model_dump(mode="json"),
-                "query_schema":Query.model_json_schema(),"claim_schema":proposal_schema(config.drill_down) if config.adapter=="ollama" else ModelTurn.model_json_schema(),
+                "query_schema":Query.model_json_schema(),"claim_schema":proposal_schema(config.drill_down) if config.adapter in {"ollama","anthropic"} else ModelTurn.model_json_schema(),
                 "tools_allowed":config.drill_down,
                 "evidence_queries":{key:sorted(value) for key,value in retrieved.items()},"observation":observation}
             raw=model_call(payload,purpose)
             try:
-                if config.adapter=="ollama":
+                if config.adapter in {"ollama","anthropic"}:
                     turn=compile_proposals(ProposalTurn.model_validate_json(raw),snapshot,graph,retrieved,
                                            config.model,config.graph)
                 else:turn=ModelTurn.model_validate_json(raw)
@@ -245,7 +253,8 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
             "structural":[v.model_dump() for v in validations],"semantic":[v.model_dump() for v in semantic_results],
             "retrieved_event_ids":sorted(observed),"graph":graph.model_dump(mode="json") if config.graph else None,
             "partial":bool(incomplete or snapshot.missing_sources),"counts":dict(meter.counts),
-            "tokens_measured":config.adapter=="ollama","cost_usd":None}
+            "tokens_measured":config.adapter in {"ollama","anthropic"},
+            "cost_usd":meter.counts["cost_microusd"]/1e6 if config.adapter=="anthropic" else None}
     except (Exhausted,TimeoutError) as exc:
         machine.transition("EXPIRED")
         return {"state":"EXPIRED","claims":[],"decisions":[],"partial":True,"counts":dict(meter.counts),
@@ -258,12 +267,16 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
 
 def run_case(snapshot,config,output_root,*,dataset_hash="unit-fixture",intervention=None,es=None,cancel=None,identity=None):
     hypothesis=load_hypothesis()
+    decoding={"temperature":0,"seed":20260905,"num_predict":2048,"think":False,"num_ctx":LOCAL_CONTEXT_TOKENS}
+    if config.adapter=="anthropic":
+        decoding={"temperature":"provider_default" if config.model=="claude-sonnet-5" else 0,
+                  "seed":None,"max_tokens":2048,"thinking":"disabled","prompt_caching":False,"automatic_retries":False}
     manifest={"code":identity or code_identity(),"dataset_hash":dataset_hash,"snapshot":snapshot.id,
         "parser":"synthetic-canonical-2.0.0","contract_hash":digest(hypothesis),"contract":hypothesis.model_dump(mode="json"),
         "prompt_hashes":{"investigator":digest(INVESTIGATOR_PROMPT),"semantic":digest(SEMANTIC_PROMPT)},
         "tool_schema":Query.model_json_schema(),"config":config.model_dump(mode="json"),"es":es,
         "model":{"provider":config.adapter,"version":config.model,"verifier":config.verifier_model,
-                 "decoding":{"temperature":0,"seed":20260905,"num_predict":2048,"think":False,"num_ctx":LOCAL_CONTEXT_TOKENS},
+                 "decoding":decoding,
                  "digest":config.model_digest,"verifier_digest":config.verifier_digest,
                  "scripted_only":config.adapter in {"scripted","rules"}},
         "disclosure":"newly-generated-synthetic-only","intervention":intervention or {}}

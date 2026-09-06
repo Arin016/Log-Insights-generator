@@ -167,5 +167,5 @@ def aggregate(rows,bootstrap_samples=400):
         "measured_model_tokens":({"input":counts["input_tokens"],"output":counts["output_tokens"],
             "calls_with_reported_usage":counts["usage_reported_calls"],"attempted_calls":counts["model_calls"],
             "complete":counts["usage_reported_calls"]==counts["model_calls"]} if counts["usage_reported_calls"] else None),
-        "monetary_cost_usd":None,
+        "monetary_cost_usd":counts["cost_microusd"]/1e6 if "cost_microusd" in counts else None,
         "interpretation":"Scripted control-flow/synthetic-oracle evaluation only unless explicitly recorded as live; family intervals do not establish real-world generalization."}
