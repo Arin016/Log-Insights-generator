@@ -82,7 +82,12 @@ class ClaudeAdapter:
             # Definite validation/auth/rate-limit rejection has no generated-token charge.
             if exc.code in {400,401,403,404,413,429}:
                 self.budget.settle(ident,0,{"http_status":exc.code,"generation_rejected":True})
-            raise ProviderError("Claude HTTP "+str(exc.code)) from None
+            detail=""
+            try:
+                error=json.loads(exc.read(8192)).get("error",{})
+                detail=str(error.get("message",""))[:2000].replace(self._key,"[REDACTED]")
+            except (ValueError,AttributeError):pass
+            raise ProviderError("Claude HTTP "+str(exc.code)+": "+detail) from None
         except (URLError,TimeoutError):raise ProviderError("Claude transport failure; spending reservation retained") from None
         usage=data.get("usage",{})
         inputs=usage.get("input_tokens");outputs=usage.get("output_tokens")
