@@ -1,0 +1,15 @@
+# System and model card
+
+Status: implemented local research prototype, one synthetic hypothesis family. Audited V1 and V2 are distinct code paths. No production integration, measured analyst impact, expert adjudication, calibrated confidence, publication acceptance or SAP semantic fidelity is established.
+
+Task: identify and verify an out-of-approved-scope vendor-bank change preceding a completed payment within one hour for the same actor/session/object. Claims describe evidence relationships. They must not infer intent or criminal conduct. This task is narrower than general privileged-access investigation.
+
+The deterministic rule baseline correlates observed bank/payment rows. Scripted investigator and semantic adapters exercise protocol and policy branches; their decisions are not learned judgments. The local model adapter uses an explicitly installed, digest-pinned Ollama model over loopback with temperature zero and a fixed seed. No model is downloaded automatically. The manifest records provider, model names/digests, decoding settings, prompt hashes, schema, configuration, date and code. Provider token counts are measured only when returned; interrupted calls have unknown usage. Monetary and energy costs are not measured. Ollama supports structured output and usage counts; see its [chat API documentation](https://docs.ollama.com/api/chat).
+
+Separate semantic context prevents sharing an investigator's persuasion or confidence, but the same model may repeat the same errors. Semantic judgments remain probabilistic. Generator-oracle support metrics are explicitly distinguished from expert semantic citation support. The latter remains pending independent labels.
+
+Triage is interpretable and score-free. It separates severity, support label, completed obligations and terminal status. Missing sources, incomplete retrieval or unresolved checks require review; unsafe input, contradiction and invalid structure block normal surfacing. Calibration is implemented as a gated research interface but not fitted. No numerical decision score is a validated probability.
+
+Intended users are local developers and researchers evaluating contracts, retrieval, verification and bounded control. Prohibited interpretations include automated disciplinary decisions, a production-ready fraud detector, validation of any employee's behavior, real-world prevalence estimates or company-approved public release.
+
+Feedback schema and local evidence reports support review, but no analyst usability/priority study has been run. Operational integration, additional hypothesis families, larger independently labeled data, alternate model families, repeated stochastic trials, confidence calibration and publication clearance remain separate future gates.

@@ -15,9 +15,9 @@ from .gateway import Gateway, Capability, MemoryBackend, Query
 from .capsules import build_capsule
 from .control import Budgets, Meter, StateMachine, Exhausted, supervised
 from .ledger import RunLedger, code_identity
-from .models import ScriptedInvestigator, OllamaAdapter, ModelTurn, ProposalTurn, compile_proposals, proposal_schema, FIELDS, INVESTIGATOR_PROMPT, SEMANTIC_PROMPT
+from .models import ScriptedInvestigator, OllamaAdapter, ModelTurn, ProposalTurn, compile_proposals, proposal_schema, local_payload, LOCAL_CONTEXT_TOKENS, FIELDS, INVESTIGATOR_PROMPT, SEMANTIC_PROMPT
 from .security import detect
-from .verification import verify_claim, contradiction_ids, semantic_payload, ScriptedSemanticVerifier, triage
+from .verification import verify_claim, contradiction_ids, semantic_payload, validate_semantic_references, ScriptedSemanticVerifier, triage
 
 
 class HarnessConfig(StrictModel):
@@ -130,7 +130,8 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
             size=len(canonical_json(payload).encode())
             # Conservative UTF-8-byte reservation; never presented as measured tokenizer usage.
             meter.charge("token_upper_bound",size+config.budgets.output_bytes_per_call)
-            emit({"kind":"model_request","purpose":purpose,"payload":payload})
+            emit({"kind":"model_request","purpose":purpose,"payload":payload,
+                  "provider_payload":local_payload(payload) if config.adapter=="ollama" else None})
             if semantic and config.adapter=="scripted":
                 raw=verifier.verify(payload).model_dump_json();usage=None
             elif semantic: raw,usage=verifier.semantic(payload)
@@ -166,7 +167,8 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
                 observation={"schema_error":"Return a valid object matching claim_schema; final requires query null.","errors":detail}
                 continue
             if turn.action=="final":
-                meter.charge("finalization_calls");claims=list(turn.claims);break
+                meter.charge("finalization_calls")
+                claims=[c.model_copy(update={"mandatory_checks":hypothesis.required_checks}) for c in turn.claims];break
             if not config.drill_down: raise PermissionError("single-pass harness cannot query tools")
             observation=query(turn.query.model_dump(exclude_none=True),"investigator_queries")
             current=capsule(observed.values());purpose="continuation_calls"
@@ -200,7 +202,7 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
             enriched.append(claim);incomplete |= query_partial
             if val.valid and config.semantic:
                 raw=model_call(semantic_payload(claim,snapshot),"verifier_calls",True)
-                sem=SemanticVerdict.model_validate_json(raw)
+                sem=validate_semantic_references(SemanticVerdict.model_validate_json(raw),claim)
             else:
                 sem=SemanticVerdict(label="INSUFFICIENT_EVIDENCE",reasons=("disabled or structural rejection",),evidence_ids=(),uncertainty="HIGH")
             semantic_results.append(sem)
@@ -228,6 +230,8 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
                 state,reasons=triage(val,sem,checks=checks,required_checks=required,
                     contradictions=contradiction,missing=snapshot.missing_sources if config.coverage else (),
                     truncated=incomplete if config.coverage else False,selective=config.selective,semantic_enabled=config.semantic)
+                if claim.unknowns and state=="SURFACE_TO_ANALYST":
+                    state,reasons="HUMAN_REVIEW_REQUIRED",("unresolved_claim_unknowns",)
             decisions.append({"claim_id":claim.claim_id,"state":state,"reasons":reasons,
                               "checks":sorted(checks),"support_label":sem.label,"severity":claim.severity})
         machine.transition("POLICY_DECISION")
@@ -259,7 +263,7 @@ def run_case(snapshot,config,output_root,*,dataset_hash="unit-fixture",intervent
         "prompt_hashes":{"investigator":digest(INVESTIGATOR_PROMPT),"semantic":digest(SEMANTIC_PROMPT)},
         "tool_schema":Query.model_json_schema(),"config":config.model_dump(mode="json"),"es":es,
         "model":{"provider":config.adapter,"version":config.model,"verifier":config.verifier_model,
-                 "decoding":{"temperature":0,"seed":20260905,"num_predict":2048,"think":False},
+                 "decoding":{"temperature":0,"seed":20260905,"num_predict":2048,"think":False,"num_ctx":LOCAL_CONTEXT_TOKENS},
                  "digest":config.model_digest,"verifier_digest":config.verifier_digest,
                  "scripted_only":config.adapter in {"scripted","rules"}},
         "disclosure":"newly-generated-synthetic-only","intervention":intervention or {}}

@@ -14,7 +14,7 @@ from core.v2.engine import HarnessConfig,run_case
 from core.v2.ledger import code_identity,verify_ledger
 from .configurations import configurations
 from .synthetic import load_case
-from .metrics import case_metrics,aggregate
+from .metrics import case_metrics,aggregate,attack_outcome
 
 ROOT=Path(__file__).resolve().parents[1]
 
@@ -101,6 +101,7 @@ def evaluate(dataset,protocol_path,output,*,splits=("development",),names=None,e
                 # Ground truth is first loaded in the evaluator, after the investigation completed.
                 label=json.loads((dataset/item["case_id"]/"label.json").read_text())
                 row=case_metrics(result,label,snapshot)
+                row["metrics"]["mechanical_attack_goal_rate"]=attack_outcome(result,label,path/"trace.jsonl")
                 row.update({"configuration":config.name,"run_path":str(path.relative_to(out)),"run_id":path.name})
                 return row
             with ThreadPoolExecutor(max_workers=workers) as pool:

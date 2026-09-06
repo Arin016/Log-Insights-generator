@@ -101,6 +101,16 @@ def semantic_payload(claim, snapshot):
             for ref in references if ref.event_id in snapshot.by_id]}
 
 
+def validate_semantic_references(verdict, claim):
+    allowed={r.event_id for r in claim.supporting_evidence+claim.contradicting_evidence}
+    support={r.event_id for r in claim.supporting_evidence}
+    if not verdict.reasons or not set(verdict.evidence_ids)<=allowed:
+        raise ValueError("semantic verdict must cite supplied evidence and give reasons")
+    if verdict.label=="SUPPORTED" and not support<=set(verdict.evidence_ids):
+        raise ValueError("supported verdict must cite the complete minimum supporting set")
+    return verdict
+
+
 class ScriptedSemanticVerifier:
     """Deterministic protocol fake, not an independent probabilistic support result."""
     model_version = "scripted-semantic-2.0"

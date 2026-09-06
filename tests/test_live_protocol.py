@@ -29,3 +29,14 @@ def test_live_grammar_encodes_final_query_null():
     assert schema["properties"]["query"]=={"type":"null"}
     branches=proposal_schema(True)["anyOf"]
     assert branches[0]["properties"]["proposals"]["maxItems"]==0
+
+
+def test_semantic_verdict_cannot_cite_fabricated_or_incomplete_evidence():
+    import pytest
+    from core.v2.contracts import SemanticVerdict
+    from core.v2.verification import validate_semantic_references
+    from tests.test_verification import claim_for
+    claim=claim_for()
+    for ids in (("fabricated",),()):
+        verdict=SemanticVerdict(label="SUPPORTED",reasons=("supported",),evidence_ids=ids,uncertainty="LOW")
+        with pytest.raises(ValueError):validate_semantic_references(verdict,claim)

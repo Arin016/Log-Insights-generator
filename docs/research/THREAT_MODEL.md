@@ -1,0 +1,13 @@
+# Threat model and security limits
+
+Scope: local, newly generated synthetic audit data. Assets are tenant/request isolation, immutable source attribution, bounded execution, valid evidence claims and accurate completion status. An attacker may control log text and business fields, duplicate/reorder records, inject schema-breaking strings, request a different scope, fabricate IDs or attempt endless calls. The model and all text it produces are untrusted.
+
+Trust boundaries are source ingestion, capability construction, gateway result validation, typed claim validation, isolated semantic verification and the external worker supervisor. Fixed scope, allowed source/template checks and source hashes remain enforced in every baseline and ablation. The no-injection-defenses variant removes text filtering and phrase detection, not the OS or gateway boundary. Baseline variants deliberately relax claim policy for comparison; they are not deployment modes.
+
+Defenses include strict schemas, nonempty ingestion identities, aware UTC times, exact source hashes, an allowlist of visible structured fields, untrusted-data markers, known attack/canary detection, bounded read-only queries, output limits, repair limits, fail-closed validation, explicit review/abstention and parent cancellation. Pipe escaping only preserves syntax. It does not prevent instruction following.
+
+The generated attacks cover concealment, false accusations/fabrication, exfiltration requests, schema hijack, resource exhaustion, cross-scope requests and split instructions. example.invalid and synthetic canaries are deliberate non-secret fixtures. Tests also exercise forged/stale evidence, cross-tenant rows, unauthorized query templates, cursor reuse, truncation, altered hashes, malformed parser inputs and killed workers.
+
+Known limits: the detector recognizes a finite phrase set and is not a general prompt-injection classifier. No arbitrary attacker benchmark, adaptive red team or expert-adjudicated semantic attack study has been performed. A surfaced finding on a labeled attack is a conservative policy breach, not automatically attacker-goal success. The attack objective must be assessed separately from utility and refusal. Exfiltration capability is absent by construction; this does not prove every model-generated text is safe.
+
+The local administrator, host compromise, edited code or trusted dependency compromise are outside this experiment. The ledger does not resist an administrator rewriting both files and seals. Elasticsearch authentication is intentionally absent only on the dedicated loopback synthetic service. Do not use this configuration for company or customer data. No external service, publication, upload or production change is part of this work.
