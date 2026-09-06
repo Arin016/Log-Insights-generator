@@ -10,6 +10,14 @@ from core.v2.spending import SpendingLedger
 from core.v2.anthropic_adapter import ClaudeAdapter,private_key,ProviderError,supported_schema
 
 
+def test_provider_schema_inlines_refs_and_preserves_original_validation():
+    from core.v2.models import proposal_schema,ProposalTurn
+    converted=supported_schema(proposal_schema())
+    assert '$defs' not in json.dumps(converted) and '$ref' not in json.dumps(converted)
+    assert 'maxLength' not in json.dumps(converted)
+    with pytest.raises(ValueError):ProposalTurn.model_validate({'action':'final','query':{'template':'seed_events'}})
+
+
 def test_reservations_survive_reopen_and_cannot_reset(tmp_path):
     p=tmp_path/'spending.sqlite';b=SpendingLedger.initialize(p,500)
     call=b.reserve(400,'run','model')

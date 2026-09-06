@@ -39,6 +39,17 @@ def private_key():
 
 def supported_schema(value):
     """Remove unsupported decoder constraints, retaining strict Pydantic validation."""
+    if isinstance(value,dict) and "$defs" in value:
+        definitions=value["$defs"]
+        def expand(item):
+            if isinstance(item,list):return [expand(x) for x in item]
+            if not isinstance(item,dict):return item
+            if "$ref" in item:
+                ref=item["$ref"]
+                if not ref.startswith("#/$defs/"):raise ValueError("external schema reference refused")
+                return expand(definitions[ref.rsplit("/",1)[1]])
+            return {k:expand(v) for k,v in item.items() if k!="$defs"}
+        value=expand(value)
     if isinstance(value,list):return [supported_schema(v) for v in value]
     if not isinstance(value,dict):return value
     removed={"minLength","maxLength","minimum","maximum","maxItems","title"}
