@@ -1,0 +1,9 @@
+{
+  "index": "ff-insights-synthetic-v2-36724623a40c4148",
+  "url": "http://127.0.0.1:19200",
+  "dataset_hash": "36724623a40c4148cf956562842c818756ac376d0681bbb666c9d093326048d5",
+  "events": 2284,
+  "cases": 138,
+  "elasticsearch_version": "8.13.4",
+  "write_blocked": true
+}

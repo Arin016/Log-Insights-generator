@@ -13,3 +13,21 @@ Pilot scope: first six development variants of the existing development corpus, 
 The existing scripted held-out experiment at 6604e6f completed 874 case-runs. The Ollama held-out experiment was interrupted at the user's request; its completed and partial outputs remain under artifacts/final-local with interrupted.json. It must not be reported as a completed experiment or silently merged with Claude results. The new provider adapter does not retroactively change the frozen scripted evidence.
 
 Claude uses a supported subset of the schema decoder, while original strict Pydantic constraints remain enforced locally. Refusals, output limits, schema failures and verifier citation failures are visible outcomes. See [structured-output constraints](https://platform.claude.com/docs/en/build-with-claude/structured-outputs). Credentials and private reasoning blocks are excluded from the run trace. Returned usage, request ID, response model, stop reason and billed-token cost are recorded.
+
+## Completed pilot results
+
+Both frozen six-case development experiments completed 36 case-runs (six configurations × six variants). This is one generated family and is unsuitable for confidence intervals or model rankings. The variants were positive, multihop, authorized, no-evidence, missing-source and conflicting-evidence.
+
+Haiku investigator with Sonnet verifier used **$0.481** in the six-configuration experiment. The required-baseline subset behaved as follows:
+
+- rules and naive single-pass each surfaced 2/2 matching positive claims and 2 unsupported claims; terminal disposition matched 3/6 labels;
+- scoped single-pass surfaced no claims and matched 3/6 dispositions;
+- demo-style ReAct exhausted its 12-call budget in 5/6 cases and matched 1/6 dispositions;
+- V2 without semantic verification produced generator-matching candidates in both positive cases but retained both for human review because the model reported unresolved unknowns; it matched 3/6 terminal labels;
+- complete V2 likewise produced matching candidates in both positive cases. Sonnet labeled one PARTIALLY_SUPPORTED and one SUPPORTED with high uncertainty, so both remained in review. It rejected the authorized case structurally, abstained on no-evidence and conflicting-evidence, and exhausted its call budget on the missing-source case. It surfaced 0 claims and matched 3/6 terminal labels.
+
+The Sonnet-investigator experiment used **$0.459** before conservative budget reservations prevented later configurations from making provider calls. Naive single-pass surfaced both matching positive claims plus one unsupported authorized-case claim and matched 4/6 terminal labels. Scoped single-pass missed both positives and produced one unsupported claim. Demo-style ReAct exhausted the 12-call budget in four cases, hit the 120-second parent deadline during one call, and stopped before another case could reserve enough approved spend. Complete V2 and no-semantic V2 were not actually sampled; all 12 runs expired locally at the spending gate. Their zeros are budget-limited missing measurements, not Sonnet V2 performance.
+
+Across preflights and both experiments, the provider reported **$0.961364** of measured use. One Sonnet request was still in flight when the parent deadline fired, so its **$2.020480** worst-case reservation remains unresolved. Total measured-plus-reserved exposure is **$2.981844 / $5.000000**. No more paid calls are permitted under this pilot. The two earlier schema preflights were rejected before generation and recorded zero cost.
+
+These results support four engineering observations: schema-constrained output alone does not prevent wrong business judgments; the original lossy pipe representation can remove identity fields needed for reliable matching; unproductive tool loops require strict call limits; and independent evidence/support gates can convert a correct candidate into review rather than surfacing it. They do not support a conclusion that Haiku is better than Sonnet, that V2 improves a live model, or that the task generalizes beyond this synthetic development family.

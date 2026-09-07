@@ -1,0 +1,19 @@
+# Dataset card — ff-synthetic-2.0.0
+
+All records were newly generated from source templates; no company/customer logs, original .env, historical findings or private outputs were used. One synthetic vendor-bank-change/payment family is modeled. Transaction/table names are taxonomy labels, not a validated SAP process simulation. Account strings are explicitly synthetic.
+
+Final scripted corpus: seed 20260906, three generated families, 23 variants per family, **69 cases and 1,125 distinct canonical events**. Full dataset hash: `4e87dea56c51d83959b3cc6fae04e34eadaf532a1678845e9c2488d1bb6e15ea`. The dedicated Elasticsearch index is `ff-insights-synthetic-v2-4e87dea56c51d839`, explicitly mapped, content-verified and write-blocked after seeding. The seed receipt is retained with experiment evidence.
+
+Family 0 is development, family 1 test and family 2 challenge: 23 cases per split. Every split contains one case in each stratum: positive, multihop, authorized, no_evidence, missing_source, conflicting, duplicate_reordered, large, unseen, pending, wrong_actor, wrong_object, delayed, rollback, tool_error, tool_timeout, injection_conceal, injection_false_positive, injection_exfiltrate, injection_hijack, injection_exhaust, injection_cross_scope and injection_split. The manifest records these exact counts and per-file hashes.
+
+The earlier development corpus uses seed 20260905 and six families, 138 cases and 2,284 unique events; hash `36724623a40c4148cf956562842c818756ac376d0681bbb666c9d093326048d5`. Claude's $5 pilot uses only its first six development variants: positive, multihop, authorized, no_evidence, missing_source and conflicting. It provides no held-out or prompt-injection effectiveness estimate.
+
+The generator varies opaque scope/entity IDs, dates, approved operations, transactions, bank values, delay and noise. Siblings stay in the same split. Inputs contain only source records and snapshot metadata; labels and fault schedules are separate files. The investigator never receives categories, expected claims or generator labels. The evaluator loads labels after investigation. Infrastructure fault schedules are injected outside model input.
+
+Ground truth contains bounded expected claims, minimum support, required paths, contradictions, required checks, should-surface/review/abstain outcome, category and label provenance. Labels are authored by the same generator as the cases and are not independently expert-adjudicated. Repeated templates and shared label assumptions can make scores optimistic. IDs do not encode outcomes, but taxonomy, text phrases and artifacts of generation remain potential shortcuts.
+
+The large stratum adds 240 unrelated-object display events and exercises initial context truncation; dedicated gateway tests exercise pagination with small pages. It does not establish performance on millions of same-object records. The challenge family is held out by identity/seed parameters, not by unseen adaptive attack designs. The finite phrase detector was developed against the known attack templates. A one-family-per-split study is inadequate for meaningful generalization intervals; pooled family-bootstrap intervals are descriptive only.
+
+Fault/attack labels still contain the underlying positive evidence pattern while their correct terminal disposition is failure, expiry or unsafe input. Therefore claim recall counts safe abstentions as missed underlying patterns. Report terminal correctness and surfaced coverage alongside claim recall; do not describe 100% terminal correctness as 100% detection recall.
+
+Intended use is repeatable control-flow, evidence-contract and resource-bound research. Prohibited uses include estimating real customer frequency, validating misconduct, reporting production performance, training on company records, or claiming expert semantic correctness. Any public release remains subject to the user's disclosure boundary and written approval.

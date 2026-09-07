@@ -1,0 +1,18 @@
+{
+  "archive": "synthetic-and-local-evidence-20260906.tar.gz",
+  "sha256": "e128813d99c27e7c5d233de41a524c05b3c01c6d5b26446ee90eb7908796c47d",
+  "bytes": 19918047,
+  "roots": [
+    "development-v2",
+    "final-synthetic-v2",
+    "dev-memory-1",
+    "dev-local-model-1",
+    "dev-local-model-2",
+    "dev-local-model-3",
+    "final-scripted",
+    "final-local",
+    "analysis-final-scripted-2"
+  ],
+  "files": 7587,
+  "contains": "Only newly generated synthetic evidence, completed experiments and explicitly interrupted Ollama experiment. No runtime directory or credential file."
+}

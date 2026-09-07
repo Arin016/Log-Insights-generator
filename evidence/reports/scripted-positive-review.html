@@ -1,0 +1,266 @@
+<!doctype html><html lang="en"><meta charset="utf-8"><meta name="viewport" content="width=device-width"><meta http-equiv="Content-Security-Policy" content="default-src &#39;none&#39;; style-src &#39;unsafe-inline&#39;"><title>FF Insights — synthetic evidence review</title><style>body{font:16px/1.5 system-ui,sans-serif;max-width:1100px;margin:40px auto;padding:0 24px;color:#16313b;background:#fafbfc}h1{font-size:32px}h2{margin-top:32px}h3{margin-top:0}section{background:white;border:1px solid #ccd7dd;border-radius:10px;padding:22px;margin:18px 0}pre{font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere;background:#f0f4f7;padding:14px}a{color:#076b7b}code{overflow-wrap:anywhere}dl{display:grid;grid-template-columns:160px 1fr;gap:8px}dt{font-weight:600}dd{margin:0;overflow-wrap:anywhere}.state{display:inline-block;padding:7px 12px;background:#e4eef0;border-radius:6px;font-weight:700}.muted{color:#49646f}footer{font-size:13px;margin:32px 0}</style><h1>Synthetic evidence review</h1><p class="state">SURFACE_TO_ANALYST</p><p class="muted">Local research record. Source data and model statements are untrusted. Severity and support are separate.</p><section><dl><dt>Run</dt><dd>run-7121958111a84e66ac32258a6eedf46d</dd><dt>Model</dt><dd>scripted-investigator-2.0</dd><dt>Configuration</dt><dd>v2</dd><dt>Partial result</dt><dd>False</dd><dt>Scope</dt><dd>{&#x27;request&#x27;: &#x27;case-928339debe638419&#x27;, &#x27;tenant&#x27;: &#x27;synthetic-tenant-1&#x27;}</dd><dt>Code commit</dt><dd>6604e6ff3d1943cb080cded74207d7663974253b</dd></dl></section><h2>Claims and review decisions</h2><section><h3>Bank details changed outside approved scope before a completed payment.</h3><pre>{
+  &quot;checks&quot;: [
+    &quot;approved_scope&quot;,
+    &quot;contradiction_search&quot;,
+    &quot;domain&quot;,
+    &quot;event_existence&quot;,
+    &quot;identity&quot;,
+    &quot;integrity&quot;,
+    &quot;query_completeness&quot;,
+    &quot;relationship_path&quot;,
+    &quot;schema&quot;,
+    &quot;scope&quot;,
+    &quot;semantic_support&quot;,
+    &quot;source_completeness&quot;,
+    &quot;temporal&quot;
+  ],
+  &quot;claim_id&quot;: &quot;claim-e55d5b5e0f3e5b51&quot;,
+  &quot;reasons&quot;: [
+    &quot;all_enabled_obligations_satisfied&quot;
+  ],
+  &quot;severity&quot;: &quot;HIGH&quot;,
+  &quot;state&quot;: &quot;SURFACE_TO_ANALYST&quot;,
+  &quot;support_label&quot;: &quot;SUPPORTED&quot;
+}</pre><p>Severity: <strong>HIGH</strong></p><p>Unknowns: []</p><h4>Supporting Evidence</h4><p><a href="#evt-8aa1ff007e8eaaff9f48859b">evt-8aa1ff007e8eaaff9f48859b</a> · query q-00001</p><pre>{
+  &quot;content_hash&quot;: &quot;cc6624b45cfc811c7c489640491a1d1b33b7ac6130e2d7d34b508f7dfddec836&quot;,
+  &quot;event_id&quot;: &quot;evt-8aa1ff007e8eaaff9f48859b&quot;,
+  &quot;fields&quot;: [
+    &quot;event_type&quot;,
+    &quot;actor&quot;,
+    &quot;session&quot;,
+    &quot;object_id&quot;,
+    &quot;occurred_at&quot;,
+    &quot;field&quot;,
+    &quot;old_value&quot;,
+    &quot;new_value&quot;,
+    &quot;table&quot;,
+    &quot;tcode&quot;,
+    &quot;approved_operations&quot;,
+    &quot;status&quot;
+  ],
+  &quot;relation&quot;: &quot;supports&quot;,
+  &quot;retrieved_by_query&quot;: &quot;q-00001&quot;,
+  &quot;source_snapshot&quot;: &quot;snap-16c9813f93da02e803406f80fb9d8619da2f0ff507ef464d2748bb6120fd90a5&quot;,
+  &quot;value_hashes&quot;: [
+    &quot;3426d1cefc3f6815d67bd3e46c03bce980924a4b03c7a4e325e66be6cc92210c&quot;,
+    &quot;15a5f91d4141b9c0a2e0f392ef38f6a8eebf2ddc1cda26ea80dc78a1be8466fc&quot;,
+    &quot;58ed3f09f48c77f1dbceb3697b44f920afd204ebf7df69ccc29fddaa51a44c50&quot;,
+    &quot;44acac702bc41994f2111b02b06c5e716d3ffd4a76700c7f82db16d948f62dcb&quot;,
+    &quot;4a005e37d3d11d3b43b7368fa013b3349b0c6e79eeefc22ae9c8228383e8d8bf&quot;,
+    &quot;08a882389c6dcc864eafe858c0aa10bfa27a6d991bd65ab3f635fa6d786181a7&quot;,
+    &quot;88d584be813b7b4f6b2d975a4b2b210b34984241318fbc19305e4a09daa993c8&quot;,
+    &quot;ee9a6de5448acca469d9518a1e7bfab58aa9fac37765c215d6e81f629d963fda&quot;,
+    &quot;44bc7581a27e628f7f80e29d8169e839982c5c781faf28d4bfc36023e6d9858d&quot;,
+    &quot;5dce86fecc43b2c3e21b296f6e774bc6e0cab0274ef2c75684195dfa1bf3b60f&quot;,
+    &quot;707c02d9ef6795d01707ccdc441f81e235ece4ac4d883840607f2f4e3b9cae04&quot;,
+    &quot;981d395a2f1db39e6bc412d2e9c5a768be61367a533f8d833888c40818b524a1&quot;
+  ]
+}</pre><p><a href="#evt-7dfea0fcbb1e0a1f73e6c6d8">evt-7dfea0fcbb1e0a1f73e6c6d8</a> · query q-00002</p><pre>{
+  &quot;content_hash&quot;: &quot;85d2004e373a5a5e5745cc6136400c01b9e63263eb8d77ceef765bb972a1ff48&quot;,
+  &quot;event_id&quot;: &quot;evt-7dfea0fcbb1e0a1f73e6c6d8&quot;,
+  &quot;fields&quot;: [
+    &quot;event_type&quot;,
+    &quot;actor&quot;,
+    &quot;session&quot;,
+    &quot;object_id&quot;,
+    &quot;occurred_at&quot;,
+    &quot;field&quot;,
+    &quot;old_value&quot;,
+    &quot;new_value&quot;,
+    &quot;table&quot;,
+    &quot;tcode&quot;,
+    &quot;approved_operations&quot;,
+    &quot;status&quot;
+  ],
+  &quot;relation&quot;: &quot;supports&quot;,
+  &quot;retrieved_by_query&quot;: &quot;q-00002&quot;,
+  &quot;source_snapshot&quot;: &quot;snap-16c9813f93da02e803406f80fb9d8619da2f0ff507ef464d2748bb6120fd90a5&quot;,
+  &quot;value_hashes&quot;: [
+    &quot;d3e6a7fe2ac444bebb21a6c6ffe83a1009f17bc5303f8adb678ab92fed03c914&quot;,
+    &quot;15a5f91d4141b9c0a2e0f392ef38f6a8eebf2ddc1cda26ea80dc78a1be8466fc&quot;,
+    &quot;58ed3f09f48c77f1dbceb3697b44f920afd204ebf7df69ccc29fddaa51a44c50&quot;,
+    &quot;44acac702bc41994f2111b02b06c5e716d3ffd4a76700c7f82db16d948f62dcb&quot;,
+    &quot;ad69eacd4b08ea6be10838479d4d02d31324c9627f45f5e5926c9b9901564e85&quot;,
+    &quot;12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126&quot;,
+    &quot;12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126&quot;,
+    &quot;12ae32cb1ec02d01eda3581b127c1fee3b0dc53572ed6baf239721a03d82e126&quot;,
+    &quot;7a198ee4473f2a431b3b2179f48cfbad84a741cc34c83256e39ea24401611fd6&quot;,
+    &quot;e363850c1a59035bac7b25b24c01d17ba9077b9d7b54ddd0817a0feecaa4d1e7&quot;,
+    &quot;707c02d9ef6795d01707ccdc441f81e235ece4ac4d883840607f2f4e3b9cae04&quot;,
+    &quot;981d395a2f1db39e6bc412d2e9c5a768be61367a533f8d833888c40818b524a1&quot;
+  ]
+}</pre><h4>Contradicting Evidence</h4><details><summary>Relationship path and required checks</summary><pre>{
+  &quot;path&quot;: [
+    &quot;edge-fdfcc001e80be5f9b08df37d&quot;,
+    &quot;edge-8b7971a5e1185f2f894b55d9&quot;
+  ],
+  &quot;checks&quot;: [
+    &quot;approved_scope&quot;,
+    &quot;identity&quot;,
+    &quot;temporal&quot;,
+    &quot;domain&quot;,
+    &quot;integrity&quot;,
+    &quot;contradiction_search&quot;,
+    &quot;query_completeness&quot;,
+    &quot;source_completeness&quot;,
+    &quot;semantic_support&quot;
+  ]
+}</pre></details></section><h2>Exact synthetic source events</h2><section id="evt-8aa1ff007e8eaaff9f48859b"><h3>BANK_CHANGE · 2026-01-02T01:32:00+00:00</h3><p><code>evt-8aa1ff007e8eaaff9f48859b</code></p><dl><dt>actor</dt><dd>actor-7f422c7424</dd><dt>session</dt><dd>session-928339debe638419</dd><dt>object_id</dt><dd>vendor-514880</dd><dt>tcode</dt><dd>FK02</dd><dt>table</dt><dd>LFBK</dd><dt>field</dt><dd>BANKN</dd><dt>old_value</dt><dd>SYNTH-ACCOUNT-3375</dd><dt>new_value</dt><dd>SYNTH-ACCOUNT-8679</dd><dt>status</dt><dd>POSTED</dd></dl><details><summary>Raw source, immutable locator and hash</summary><pre>{
+  &quot;raw_source&quot;: {
+    &quot;actor&quot;: &quot;actor-7f422c7424&quot;,
+    &quot;approved_operations&quot;: [
+      &quot;SE16&quot;
+    ],
+    &quot;event_type&quot;: &quot;BANK_CHANGE&quot;,
+    &quot;field&quot;: &quot;BANKN&quot;,
+    &quot;ingested_at&quot;: &quot;2026-01-02T04:32:00+00:00&quot;,
+    &quot;locator&quot;: &quot;record-bank&quot;,
+    &quot;new_value&quot;: &quot;SYNTH-ACCOUNT-8679&quot;,
+    &quot;object_id&quot;: &quot;vendor-514880&quot;,
+    &quot;occurred_at&quot;: &quot;2026-01-02T01:32:00+00:00&quot;,
+    &quot;old_value&quot;: &quot;SYNTH-ACCOUNT-3375&quot;,
+    &quot;request&quot;: &quot;case-928339debe638419&quot;,
+    &quot;session&quot;: &quot;session-928339debe638419&quot;,
+    &quot;source&quot;: &quot;synthetic_audit&quot;,
+    &quot;status&quot;: &quot;POSTED&quot;,
+    &quot;table&quot;: &quot;LFBK&quot;,
+    &quot;tcode&quot;: &quot;FK02&quot;,
+    &quot;tenant&quot;: &quot;synthetic-tenant-1&quot;,
+    &quot;text&quot;: &quot;Synthetic maintenance record&quot;
+  },
+  &quot;source_locator&quot;: &quot;record-bank&quot;,
+  &quot;hash&quot;: &quot;cc6624b45cfc811c7c489640491a1d1b33b7ac6130e2d7d34b508f7dfddec836&quot;,
+  &quot;snapshot&quot;: &quot;snap-16c9813f93da02e803406f80fb9d8619da2f0ff507ef464d2748bb6120fd90a5&quot;
+}</pre></details></section><section id="evt-af74884528f5d761b31c574b"><h3>INVOICE · 2026-01-02T01:39:30+00:00</h3><p><code>evt-af74884528f5d761b31c574b</code></p><dl><dt>actor</dt><dd>actor-7f422c7424</dd><dt>session</dt><dd>session-928339debe638419</dd><dt>object_id</dt><dd>vendor-514880</dd><dt>tcode</dt><dd>FB60</dd><dt>table</dt><dd>BSEG</dd><dt>field</dt><dd></dd><dt>old_value</dt><dd></dd><dt>new_value</dt><dd></dd><dt>status</dt><dd>POSTED</dd></dl><details><summary>Raw source, immutable locator and hash</summary><pre>{
+  &quot;raw_source&quot;: {
+    &quot;actor&quot;: &quot;actor-7f422c7424&quot;,
+    &quot;approved_operations&quot;: [
+      &quot;SE16&quot;
+    ],
+    &quot;event_type&quot;: &quot;INVOICE&quot;,
+    &quot;field&quot;: &quot;&quot;,
+    &quot;ingested_at&quot;: &quot;2026-01-02T04:32:00+00:00&quot;,
+    &quot;locator&quot;: &quot;record-invoice&quot;,
+    &quot;new_value&quot;: &quot;&quot;,
+    &quot;object_id&quot;: &quot;vendor-514880&quot;,
+    &quot;occurred_at&quot;: &quot;2026-01-02T01:39:30+00:00&quot;,
+    &quot;old_value&quot;: &quot;&quot;,
+    &quot;request&quot;: &quot;case-928339debe638419&quot;,
+    &quot;session&quot;: &quot;session-928339debe638419&quot;,
+    &quot;source&quot;: &quot;synthetic_audit&quot;,
+    &quot;status&quot;: &quot;POSTED&quot;,
+    &quot;table&quot;: &quot;BSEG&quot;,
+    &quot;tcode&quot;: &quot;FB60&quot;,
+    &quot;tenant&quot;: &quot;synthetic-tenant-1&quot;,
+    &quot;text&quot;: &quot;&quot;
+  },
+  &quot;source_locator&quot;: &quot;record-invoice&quot;,
+  &quot;hash&quot;: &quot;a97f797a5d2ee90f49f8723bf5bc36d5cc2a4fc4c8f7a99af3432c846c3b5aea&quot;,
+  &quot;snapshot&quot;: &quot;snap-16c9813f93da02e803406f80fb9d8619da2f0ff507ef464d2748bb6120fd90a5&quot;
+}</pre></details></section><section id="evt-8061a0b2df59a8e56f01f380"><h3>DISPLAY · 2026-01-02T01:43:00+00:00</h3><p><code>evt-8061a0b2df59a8e56f01f380</code></p><dl><dt>actor</dt><dd>actor-7f422c7424</dd><dt>session</dt><dd>session-928339debe638419</dd><dt>object_id</dt><dd>unrelated-0</dd><dt>tcode</dt><dd>SE16</dd><dt>table</dt><dd>LFA1</dd><dt>field</dt><dd></dd><dt>old_value</dt><dd></dd><dt>new_value</dt><dd></dd><dt>status</dt><dd>POSTED</dd></dl><details><summary>Raw source, immutable locator and hash</summary><pre>{
+  &quot;raw_source&quot;: {
+    &quot;actor&quot;: &quot;actor-7f422c7424&quot;,
+    &quot;approved_operations&quot;: [
+      &quot;SE16&quot;
+    ],
+    &quot;event_type&quot;: &quot;DISPLAY&quot;,
+    &quot;field&quot;: &quot;&quot;,
+    &quot;ingested_at&quot;: &quot;2026-01-02T04:32:00+00:00&quot;,
+    &quot;locator&quot;: &quot;noise-0&quot;,
+    &quot;new_value&quot;: &quot;&quot;,
+    &quot;object_id&quot;: &quot;unrelated-0&quot;,
+    &quot;occurred_at&quot;: &quot;2026-01-02T01:43:00+00:00&quot;,
+    &quot;old_value&quot;: &quot;&quot;,
+    &quot;request&quot;: &quot;case-928339debe638419&quot;,
+    &quot;session&quot;: &quot;session-928339debe638419&quot;,
+    &quot;source&quot;: &quot;synthetic_audit&quot;,
+    &quot;status&quot;: &quot;POSTED&quot;,
+    &quot;table&quot;: &quot;LFA1&quot;,
+    &quot;tcode&quot;: &quot;SE16&quot;,
+    &quot;tenant&quot;: &quot;synthetic-tenant-1&quot;,
+    &quot;text&quot;: &quot;Synthetic display only&quot;
+  },
+  &quot;source_locator&quot;: &quot;noise-0&quot;,
+  &quot;hash&quot;: &quot;510447d0a2f7db0a08690da635a950e71ee7f9feda61e346b2f231fe382a5cbc&quot;,
+  &quot;snapshot&quot;: &quot;snap-16c9813f93da02e803406f80fb9d8619da2f0ff507ef464d2748bb6120fd90a5&quot;
+}</pre></details></section><section id="evt-7dfea0fcbb1e0a1f73e6c6d8"><h3>PAYMENT · 2026-01-02T01:47:00+00:00</h3><p><code>evt-7dfea0fcbb1e0a1f73e6c6d8</code></p><dl><dt>actor</dt><dd>actor-7f422c7424</dd><dt>session</dt><dd>session-928339debe638419</dd><dt>object_id</dt><dd>vendor-514880</dd><dt>tcode</dt><dd>F110</dd><dt>table</dt><dd>REGUH</dd><dt>field</dt><dd></dd><dt>old_value</dt><dd></dd><dt>new_value</dt><dd></dd><dt>status</dt><dd>POSTED</dd></dl><details><summary>Raw source, immutable locator and hash</summary><pre>{
+  &quot;raw_source&quot;: {
+    &quot;actor&quot;: &quot;actor-7f422c7424&quot;,
+    &quot;approved_operations&quot;: [
+      &quot;SE16&quot;
+    ],
+    &quot;event_type&quot;: &quot;PAYMENT&quot;,
+    &quot;field&quot;: &quot;&quot;,
+    &quot;ingested_at&quot;: &quot;2026-01-02T04:32:00+00:00&quot;,
+    &quot;locator&quot;: &quot;record-payment&quot;,
+    &quot;new_value&quot;: &quot;&quot;,
+    &quot;object_id&quot;: &quot;vendor-514880&quot;,
+    &quot;occurred_at&quot;: &quot;2026-01-02T01:47:00+00:00&quot;,
+    &quot;old_value&quot;: &quot;&quot;,
+    &quot;request&quot;: &quot;case-928339debe638419&quot;,
+    &quot;session&quot;: &quot;session-928339debe638419&quot;,
+    &quot;source&quot;: &quot;synthetic_audit&quot;,
+    &quot;status&quot;: &quot;POSTED&quot;,
+    &quot;table&quot;: &quot;REGUH&quot;,
+    &quot;tcode&quot;: &quot;F110&quot;,
+    &quot;tenant&quot;: &quot;synthetic-tenant-1&quot;,
+    &quot;text&quot;: &quot;&quot;
+  },
+  &quot;source_locator&quot;: &quot;record-payment&quot;,
+  &quot;hash&quot;: &quot;85d2004e373a5a5e5745cc6136400c01b9e63263eb8d77ceef765bb972a1ff48&quot;,
+  &quot;snapshot&quot;: &quot;snap-16c9813f93da02e803406f80fb9d8619da2f0ff507ef464d2748bb6120fd90a5&quot;
+}</pre></details></section><h2>Execution and validation</h2><pre>{
+  &quot;counts&quot;: {
+    &quot;bytes&quot;: 5445,
+    &quot;continuation_calls&quot;: 1,
+    &quot;contradiction_queries&quot;: 1,
+    &quot;finalization_calls&quot;: 1,
+    &quot;initial_calls&quot;: 1,
+    &quot;initial_queries&quot;: 1,
+    &quot;investigator_queries&quot;: 1,
+    &quot;model_calls&quot;: 3,
+    &quot;model_output_bytes&quot;: 3255,
+    &quot;observed_rows&quot;: 5,
+    &quot;rows&quot;: 5,
+    &quot;token_upper_bound&quot;: 135788,
+    &quot;tool_calls&quot;: 3,
+    &quot;verifier_calls&quot;: 1
+  },
+  &quot;supervisor&quot;: {
+    &quot;cleanup_seconds&quot;: 0.001221291022375226,
+    &quot;deadline_seconds&quot;: 10.0,
+    &quot;decision_seconds&quot;: 0.2248739170609042,
+    &quot;elapsed_seconds&quot;: 0.22609516710508615,
+    &quot;worker_terminated&quot;: true
+  },
+  &quot;structural&quot;: [
+    {
+      &quot;checks&quot;: [
+        &quot;approved_scope&quot;,
+        &quot;domain&quot;,
+        &quot;event_existence&quot;,
+        &quot;identity&quot;,
+        &quot;integrity&quot;,
+        &quot;relationship_path&quot;,
+        &quot;schema&quot;,
+        &quot;scope&quot;,
+        &quot;temporal&quot;
+      ],
+      &quot;failures&quot;: [],
+      &quot;valid&quot;: true
+    }
+  ],
+  &quot;semantic&quot;: [
+    {
+      &quot;evidence_ids&quot;: [
+        &quot;evt-8aa1ff007e8eaaff9f48859b&quot;,
+        &quot;evt-7dfea0fcbb1e0a1f73e6c6d8&quot;
+      ],
+      &quot;label&quot;: &quot;SUPPORTED&quot;,
+      &quot;reasons&quot;: [
+        &quot;scripted protocol check; not measured model support&quot;
+      ],
+      &quot;uncertainty&quot;: &quot;LOW&quot;
+    }
+  ]
+}</pre><footer>Verified local hash chain before rendering. This is not external notarization. Analyst feedback has not been collected.</footer></html>

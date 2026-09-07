@@ -1,0 +1,23 @@
+{
+  "archive": "claude-development-pilot-20260906.tar.gz",
+  "sha256": "b7b36252c04b3d3abba5fc770e81271a0f0a96ece2965d71ebb8f499e83def85",
+  "bytes": 1163041,
+  "roots": [
+    "claude-model-inventory.json",
+    "claude-haiku-pilot-protocol.json",
+    "claude-haiku-pilot-protocol-2.json",
+    "claude-haiku-pilot-protocol-3.json",
+    "claude-sonnet-pilot-protocol.json",
+    "claude-sonnet-pilot-protocol-3.json",
+    "claude-haiku-preflight",
+    "claude-haiku-preflight-2",
+    "claude-haiku-preflight-3",
+    "claude-haiku-pilot",
+    "claude-sonnet-pilot",
+    "analysis-claude-haiku-pilot",
+    "analysis-claude-sonnet-pilot"
+  ],
+  "files": 438,
+  "credential_scan": "No Anthropic key-shaped content found. Runtime key and SQLite budget file excluded. Sanitized spending summary stored separately.",
+  "scope": "Development-only paid pilot; two unbilled schema failures, one successful preflight, completed Haiku and budget-limited Sonnet experiments."
+}

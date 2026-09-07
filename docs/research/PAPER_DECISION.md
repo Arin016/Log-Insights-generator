@@ -1,0 +1,13 @@
+# Paper decision — NO-GO for manuscript or submission
+
+The implemented harness and synthetic experiments support a local engineering feasibility report. They do not yet support the proposed paper's effectiveness, novelty or production claims. No manuscript, abstract intended for submission or public blog has been drafted or published.
+
+The frozen scripted study ran 19 configurations on 46 held-out case variants, or 874 case-runs. These are two generated families, not 874 independent cases. V2 matched the generator's expected terminal status on 46/46 variants while surfacing 10 correct claims out of 28 underlying labeled chains. Intentional attack refusal and injected tool failure/timeout account for the remaining 18. This is policy/control-flow evidence from deterministic fakes, not LLM effectiveness. The baseline, no-contradiction, small-context and other failures remain visible in raw outputs.
+
+The installed small local-model pilots failed to recover positive cases reliably. The final Ollama run was interrupted when the user requested Claude. The authorized Claude work is a $5 development-only pilot; it cannot replace a held-out model evaluation. The initial successful Haiku/Sonnet preflight retrieved evidence and proposed a structurally valid claim, then required human review for partial semantic support. This illustrates the need to measure support separately from citation existence; one case proves no accuracy rate.
+
+Current blockers to a publishable empirical claim: independently adjudicated labels; more independent cases and domains; a fresh held-out live-model protocol with adequate sample size; a semantically faithful comparison to the original product; meaningful model-family and verifier comparisons; empirically calibrated/selective policies; adaptive or externally designed attacks; documented analyst review utility; and a primary-literature novelty assessment tied to the final mechanism. Graphs, ReAct, tool use, JSON, multiple roles and human review are not novel individually.
+
+Disclosure and authorship are separate gates. The user's director prohibits external customer, deployment, adoption and production-outcome claims. Written scope and author agreement are absent from this execution record. They must be resolved before any manuscript or upload. Public source availability does not grant company disclosure permission.
+
+Decision: preserve this work as implemented, unit/integration-tested and synthetically evaluated engineering evidence. Prepare the outline below as an internal research plan. Do not elevate maturity to internally evaluated on company data, manuscript drafted, submitted, accepted or published.

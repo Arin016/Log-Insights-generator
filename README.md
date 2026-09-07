@@ -1,108 +1,57 @@
-# Log Insights Generator
+# FF Insights research testbed
 
-AI-powered threat detection engine for SAP Firefighter (emergency access) audit logs. Uses stateful LLM agents to detect insider threats, fraud patterns, and policy violations.
+This repository contains two clearly separated systems:
 
-## What It Does
+- the audited public demonstration baseline at commit `2a3c28b`, retained for provenance; and
+- a V2 local research harness for one narrowly specified synthetic vendor-bank-change/payment investigation.
 
-Analyzes SAP Firefighter sessions to detect:
-- **Vendor Master Manipulation** — fictitious vendors, bank detail fraud, payment redirection
-- **Purchase Order Manipulation** — unauthorized PO changes, price manipulation  
-- **Sales Order Manipulation** — revenue fraud, unauthorized discounts
-- **Financial Fraud** — journal entry manipulation, account tampering
-- **Data Exfiltration** — bulk data access, sensitive table reads
-- **Logistics Fraud** — goods movement manipulation, inventory fraud
+The baseline code uses YAML scoping, a bounded ReAct-style loop, read-only Elasticsearch tools, event-ID existence checks and local JSON outputs. Its original README made broader threat-detection, timeout and hallucination claims that the audit did not establish. See `docs/research/BASELINE_AUDIT.md` before interpreting it.
 
-## Architecture
+V2 adds immutable source attribution, content-addressed snapshots, a typed case graph, evidence capsules, scope-bound query capabilities, atomic claims, structural/domain validation, contradiction searches, a separate-context semantic verifier, explicit coverage checks, review/abstention policy, parent-enforced deadlines and hash-sealed run ledgers. It currently implements one synthetic hypothesis. It is not a production system or a validated fraud detector.
 
-```
-[SAP Logs in Elasticsearch]
-        ↓
-[Scope Filter] ← YAML use-case configs
-        ↓
-[Parallel Stateful ReAct Sessions]
-  • LLM receives scoped events + tool catalog
-  • LLM autonomously queries ES to verify hypotheses
-  • Bounded: max 7 iterations, max 4 calls/tool, 120s timeout
-        ↓
-[Evidence Verification] — drops hallucinated event_ids
-        ↓
-[Confidence Gate] — ≥0.70 → emit, <0.70 → manual review
-        ↓
-[Persist: findings, audit logs, reports]
-```
+## Evidence status
 
-## Key Features
+At frozen commit `6604e6f`, 100 deterministic tests passed and 6 dedicated Elasticsearch integration tests passed. A frozen scripted comparison ran 19 configurations on 46 held-out synthetic variants, for 874 case-runs from only two generated families. The complete V2 scripted path matched the generator's expected terminal disposition in 46/46 cases, surfaced 10 generator-matching claims with 0 unsupported surfaced claims, and did not surface the other 18 underlying positive patterns because their correct terminal behavior was unsafe-input rejection, injected failure or timeout. These results test deterministic protocol and policy behavior; they do not measure LLM or real-world effectiveness.
 
-- **Stateful AI Agent**: Single conversation thread per use case, tools available upfront
-- **Bounded Autonomy**: Hard caps on iterations, tool calls, and wall-clock time
-- **Zero Hallucination Tolerance**: Every cited event_id verified against source data
-- **YAML-Driven Extensibility**: Add new use cases with 1 YAML + 1 prompt file, zero code changes
-- **Full Audit Trail**: Every LLM turn and tool call logged for compliance
+Development-only Llama, Claude Haiku and Claude Sonnet pilots are preserved separately. The Claude study was explicitly capped at $5 and was not run on held-out test/challenge data. It does not support model-ranking claims. `docs/research/PAPER_DECISION.md` records a paper **NO-GO**.
 
-## Setup
+## Quick verification
+
+Use Python 3.13. The default workflow never loads the legacy `.env` and uses only newly generated synthetic records.
 
 ```bash
-# 1. Start Elasticsearch
-docker compose up -d
-
-# 2. Install dependencies
-python -m venv .venv && source .venv/bin/activate
-pip install -r requirements.txt
-cp .env.example .env
-
-# 3. Seed logs
-python seed_elasticsearch.py --log-file /path/to/rak_logs.txt --recreate-index
-
-# 4. Run analysis
-python run_local.py --rak-id <RAK_ID>
+python3.13 -m venv .venv
+.venv/bin/python -m pip install -r requirements-lock.txt
+.venv/bin/python -m pytest -q
 ```
 
-## Project Structure
+For the real Elasticsearch suite, start the dedicated loopback service using `compose.research.yml` or `scripts/start_native_es.sh`, then run:
 
-```
-├── core/
-│   ├── orchestrator/pipeline.py    # Main 7-step pipeline
-│   ├── react/react_runner.py       # Stateful ReAct loop
-│   ├── analyzers/acp_client.py     # Kiro ACP session client
-│   ├── scoping/filter_engine.py    # YAML-driven event filtering
-│   ├── verification/               # Evidence verification
-│   └── pass2/event_store.py        # Elasticsearch queries
-├── applications/sap/
-│   ├── use_cases/                  # YAML scope configs
-│   ├── prompts/                    # LLM prompt templates
-│   ├── tools/sap_tools.py          # 9 read-only ES query tools
-│   └── catalogs.py                 # T-code & table catalogs
-├── data/                           # Output: findings, reports, audit logs
-└── run_local.py                    # Entry point
+```bash
+FF_ES_INTEGRATION=1 .venv/bin/python -m pytest tests/test_elasticsearch.py -q
+.venv/bin/python scripts/reproduce.py artifacts/reproduction-NEW
 ```
 
-## Configuration
+The reproduction command creates a fresh corpus, validates and seeds only its owned index, freezes a protocol, evaluates all 19 scripted configurations on test/challenge splits and derives figures from sealed raw results. Use `--memory` when Elasticsearch is unavailable. Destinations are exclusive and are never overwritten.
 
-| Variable | Default | Purpose |
-|----------|---------|---------|
-| `KIRO_MODEL` | claude-opus-4.6 | LLM model |
-| `REACT_MAX_ITERATIONS` | 7 | Max investigation rounds |
-| `REACT_MAX_PER_TOOL` | 4 | Max calls per tool |
-| `REACT_WALL_CLOCK_SECONDS` | 120 | Timeout per use case |
-| `CONFIDENCE_THRESHOLD` | 0.70 | Min confidence to emit |
+## Research layout
 
-## Sample Output
+- `core/v2/`: provenance, graph, capsules, gateway, verification, control, ledgers and model adapters
+- `applications/sap/hypotheses/`: the explicit V2 hypothesis contract
+- `eval/`: deterministic generator, configurations, runner, oracle metrics and calibration interfaces
+- `tests/`: unit, security, deadline, reproducibility and Elasticsearch integration checks
+- `scripts/research.py`: synthetic generation and guarded Elasticsearch lifecycle
+- `scripts/analyze_experiment.py`: sealed-result tables, plots and failure catalog
+- `scripts/render_case.py`: escaped self-contained analyst evidence view
+- `docs/research/`: audit, architecture, threat model, cards, metrics, reproduction and publication decision
+- `evidence/`: baseline manifests, validation logs and versioned synthetic experiment archives
 
-```
-[HIGH conf 0.85] Vendor Bank Detail Manipulation Prior to Payment Run
+Calibration code is implemented but refuses generator-only labels. No probability is reported as calibrated. Semantic-verifier outputs are separate from citation existence, but the current labels have no independent expert adjudication. Analyst feedback has a typed offline contract; no analyst study has been conducted.
 
-Sessions: FF_SESSION_001, FF_SESSION_002
-Evidence: evt_00142, evt_00156, evt_00189, evt_00201
+## Security and disclosure
 
-Reasoning: Actor JSMITH modified vendor 100234's bank details (LFBK table) 
-at 14:32 UTC, changing BANKN from ***4521 to ***7890. Within 23 minutes, 
-invoice FB60 posted for $47,500 against this vendor, followed by F110 
-payment run at 15:18 UTC.
-```
+V2 accepts only synthetic sources in this workflow. It does not read the original ignored findings, logs, reports, audits, customer data or `.env`. Model-visible tools cannot issue arbitrary Elasticsearch DSL, writes, shell commands or outbound requests. The local Elasticsearch setup is unauthenticated on loopback for synthetic data only.
 
-## Tech Stack
+Do not describe this work as deployed, production-proven, customer-used, independently validated, calibrated, submitted or published. Customer instances, deployment, adoption and production outcomes are outside the permitted disclosure boundary. External release, manuscript submission, public blog content and pushes require the user's explicit approval and applicable company/authorship clearance.
 
-- Python 3.10+
-- Elasticsearch (log storage & queries)
-- Claude LLM via Kiro CLI (stateful ACP sessions)
-- YAML (use-case configuration)
+See `docs/research/REPRODUCIBILITY.md` for exact workflows and `docs/research/METRICS.md` for denominator-level definitions.
