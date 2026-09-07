@@ -1,0 +1,32 @@
+{
+  "date": "2026-09-08",
+  "scope": "Final technical synthesis and document checks; no new experiment or paid call",
+  "report_files": {
+    "docs/research/FINAL_REPORT.md": "d72c44890060432d161450a1a6b283d2467885d18c20c2606dfae727e860e930",
+    "docs/research/FF_Insights_V2_Final_Report.docx": "aaeddf57d72b666287f02433bd5cee7391dfd49feb50130bd92ab809314a62c6"
+  },
+  "narrative_paragraphs_and_headings_transferred": 97,
+  "tables_verified_against_markdown": 7,
+  "scripted_comparison_rows_verified": 19,
+  "claude_comparison_rows_verified": 6,
+  "sonnet_unsampled_case_entries_preserved_as_missing": 12,
+  "source_links_resolved": 40,
+  "sealed_file_inventory_and_sha256_checks": {
+    "final-scripted": 4378,
+    "claude-haiku-pilot": 188,
+    "claude-sonnet-pilot": 188
+  },
+  "archive_sha256_checks": {
+    "synthetic-and-local-evidence-20260906.tar.gz": "e128813d99c27e7c5d233de41a524c05b3c01c6d5b26446ee90eb7908796c47d",
+    "claude-development-pilot-20260906.tar.gz": "b7b36252c04b3d3abba5fc770e81271a0f0a96ece2965d71ebb8f499e83def85"
+  },
+  "measured_microusd": 961364,
+  "unresolved_reserved_microusd": 2020480,
+  "rendered_pages": 17,
+  "visual_review": "All 17 latest rendered pages inspected; no clipping, overlap, broken tables or missing glyphs observed",
+  "template_sha256": "d823cd0115186b34c01c6e4b4da3be28b64ee73cac849dbd62d6f4bb6385b0fb",
+  "unchanged_template_parts_verified": 11,
+  "section_geometry_preserved": true,
+  "credential_marker_scan": "No credential marker in report Markdown or document XML/relationships",
+  "paper_decision": "NO_GO"
+}

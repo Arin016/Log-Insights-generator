@@ -1,5 +1,7 @@
 # FF Insights research testbed
 
+The [final implementation and evaluation report](docs/research/FINAL_REPORT.md) connects the architecture, all frozen comparisons, Claude pilot failures, spending, limitations and next research steps. An [editable Word version](docs/research/FF_Insights_V2_Final_Report.docx) is available for local review.
+
 This repository contains two clearly separated systems:
 
 - the audited public demonstration baseline at commit `2a3c28b`, retained for provenance; and
