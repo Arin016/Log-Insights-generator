@@ -50,10 +50,16 @@ The reproduction command creates a fresh corpus, validates and seeds only its ow
 - `scripts/research.py`: synthetic generation and guarded Elasticsearch lifecycle
 - `scripts/analyze_experiment.py`: sealed-result tables, plots and failure catalog
 - `scripts/render_case.py`: escaped self-contained analyst evidence view
+- `scripts/export_blinded_review.py` and `scripts/validate_blinded_review.py`: label-free reviewer packages and agreement summaries
 - `docs/research/`: audit, architecture, threat model, cards, metrics, reproduction and publication decision
 - `evidence/`: baseline manifests, validation logs and versioned synthetic experiment archives
 
 Calibration code is implemented but refuses generator-only labels. No probability is reported as calibrated. Semantic-verifier outputs are separate from citation existence, but the current labels have no independent expert adjudication. Analyst feedback has a typed offline contract; no analyst study has been conducted.
+
+The [blinded review protocol](docs/research/BLINDED_REVIEW_PROTOCOL.md) can measure
+reviewer agreement and review time on synthetic evidence packages without exposing
+generator answers. Its outputs remain explicitly ineligible for calibration and
+do not become real-world ground truth.
 
 ## Security and disclosure
 
