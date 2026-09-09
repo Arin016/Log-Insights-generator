@@ -1,5 +1,10 @@
 # FF Insights research testbed
 
+For a short reviewer-oriented path through the problem, design, evidence and
+limitations, start with the [engineering evidence brief](docs/research/ENGINEERING_EVIDENCE_BRIEF.md).
+The [post-study fix record](docs/research/POST_STUDY_FIXES.md) separates later
+engineering corrections from the frozen experiments that exposed them.
+
 The [final implementation and evaluation report](docs/research/FINAL_REPORT.md) connects the architecture, all frozen comparisons, Claude pilot failures, spending, limitations and next research steps. An [editable Word version](docs/research/FF_Insights_V2_Final_Report.docx) is available for local review.
 
 This repository contains two clearly separated systems:
