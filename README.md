@@ -60,6 +60,9 @@ The [blinded review protocol](docs/research/BLINDED_REVIEW_PROTOCOL.md) can meas
 reviewer agreement and review time on synthetic evidence packages without exposing
 generator answers. Its outputs remain explicitly ineligible for calibration and
 do not become real-world ground truth.
+The [AI-only blinded development study](docs/research/AI_BLINDED_REVIEW.md) records
+an initial interface failure and a corrected-rubric rerun without presenting the
+agents as human experts.
 
 ## Security and disclosure
 

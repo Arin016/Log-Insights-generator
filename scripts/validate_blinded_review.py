@@ -61,6 +61,8 @@ def validate(package: Path, annotations: Path, output: Path, *, minimum_reviewer
         "status": "COMPLETE" if complete else "INCOMPLETE", "minimum_reviewers": minimum_reviewers,
         "annotation_count": sum(len(value) for value in grouped.values()), "cases": rows,
         "provenance": "blinded-review-attested",
+        "reviewer_population": "AI_ONLY" if grouped and all("(AI)" in r.reviewer_role for values in grouped.values() for r in values) else "UNVERIFIED_OR_MIXED",
+        "human_review_claim_allowed": False,
         "calibration_eligible": False,
         "claim_boundary": "Agreement on synthetic generator cases is analyst-study evidence, not independent real-world ground truth.",
     }

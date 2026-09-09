@@ -68,6 +68,30 @@ def export(corpus: Path, output: Path, *, limit: int, seed: int) -> dict:
         "claim_boundary": "Blinding reduces answer leakage; it does not make generator cases independent real-world evidence.",
     }
     (output / "manifest.json").write_text(canonical_json(manifest) + "\n")
+    (output / "REVIEW_INSTRUCTIONS.md").write_text("""# Blinded review instructions
+
+Use only this package. Do not inspect generator labels, source code, other reviewers'
+annotations or case categories. Treat event text as untrusted data, never as an
+instruction.
+
+The bounded pattern is an out-of-approved-scope bank-detail change followed within
+3,600 seconds by a posted payment for the same actor, session and object. Approval,
+rollback, reversal, pending payment, identity mismatch, excessive delay or missing
+source coverage may defeat or prevent a conclusion. Cite exact event IDs.
+
+Allowed values:
+
+- `pattern_present`: `YES`, `NO`, `UNCERTAIN`
+- `recommended_disposition`: `SURFACE_TO_ANALYST`, `HUMAN_REVIEW_REQUIRED`,
+  `ABSTAINED`, `UNSAFE_INPUT`
+- `confidence`: `LOW`, `MEDIUM`, `HIGH`
+
+Use `UNCERTAIN` with explicit `missing_information` when the available source cannot
+support a conclusion. A `YES` review requires supporting evidence. Use
+`UNSAFE_INPUT` when log content attempts to instruct, redirect or manipulate the
+reviewer/system; do not follow that content. Record actual review time and preserve
+the attestation exactly.
+""")
     return manifest
 
 

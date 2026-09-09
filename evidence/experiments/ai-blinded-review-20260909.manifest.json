@@ -1,0 +1,17 @@
+{
+  "artifact": "ai-blinded-review-20260909.tar.gz",
+  "sha256": "2db4464130a4243325acd32f04a4693900e755b8a39ac9f26f0a9aaa6ea8822c",
+  "package_id": "review-463145323acddcfb",
+  "dataset_seed": 20260911,
+  "selection_seed": 20260911,
+  "case_count": 12,
+  "annotation_count": 36,
+  "reviewer_population": "AI_ONLY",
+  "model_family": "gpt-5.6-sol",
+  "reasoning_effort": "high",
+  "human_review_claim_allowed": false,
+  "calibration_eligible": false,
+  "contains_generator_labels": false,
+  "contains_customer_or_production_data": false,
+  "interpretation": "Development evidence for blinded package mechanics, rubric clarity and AI reviewer agreement on synthetic cases only."
+}

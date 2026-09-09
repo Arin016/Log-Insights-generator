@@ -42,6 +42,8 @@ def test_review_contract_requires_evidence_and_timezone():
 def test_export_excludes_answers_and_validates_two_reviewers(tmp_path):
     package_dir=tmp_path/"package"
     manifest=export(corpus(tmp_path),package_dir,limit=1,seed=7)
+    instructions=(package_dir/"REVIEW_INSTRUCTIONS.md").read_text()
+    assert "SURFACE_TO_ANALYST" in instructions and "generator labels" in instructions
     case_id=manifest["cases"][0]["case_id"]
     case_payload=json.loads((package_dir/case_id/"case.json").read_text())
     assert "category" not in manifest["cases"][0] and "expected_terminal" not in case_payload
@@ -52,4 +54,5 @@ def test_export_excludes_answers_and_validates_two_reviewers(tmp_path):
     report=validate(package_dir,annotations,tmp_path/"summary.json",minimum_reviewers=2)
     assert report["status"]=="COMPLETE"
     assert report["cases"][0]["pattern_agreement"]=="YES"
+    assert not report["human_review_claim_allowed"]
     assert not report["calibration_eligible"]

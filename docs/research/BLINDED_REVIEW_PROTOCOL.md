@@ -44,6 +44,10 @@ calibration interface. Agreement can support an analyst-usability statement for
 these synthetic cases. It cannot support fraud-detection accuracy, SAP fidelity,
 real-world prevalence, calibrated probabilities or publication novelty.
 
+AI-only reviewer panels must be identified as `AI_ONLY`; they cannot support a
+human-review claim. The retained [multi-agent development study](AI_BLINDED_REVIEW.md)
+shows both an initial rubric failure and a fresh corrected-rubric run.
+
 For stronger evidence, an external domain owner must construct cases independently
 of this generator, define labels before model execution, and reserve untouched
 development/test groups. That is a separate protocol and should retain the
