@@ -15,14 +15,27 @@ ELASTICSEARCH_INDEX = os.getenv("ELASTICSEARCH_INDEX", "ff_insights_events")
 ELASTICSEARCH_USERNAME = os.getenv("ELASTICSEARCH_USERNAME") or None
 ELASTICSEARCH_PASSWORD = os.getenv("ELASTICSEARCH_PASSWORD") or None
 
+# ─── LLM Backend Selection ──────────────────────────────────────────────
+LLM_BACKEND = os.getenv("LLM_BACKEND", "kiro")  # "kiro" or "http"
+
 # ─── Kiro CLI ───────────────────────────────────────────────────────────
 KIRO_BINARY = os.getenv("KIRO_BINARY", "kiro-cli")
 KIRO_MODEL = os.getenv("KIRO_MODEL", "claude-opus-4.6")
 
+# ─── HTTP Backend (Anthropic) ───────────────────────────────────────────
+ANTHROPIC_API_KEY = os.getenv("ANTHROPIC_API_KEY", "")
+ANTHROPIC_MODEL = os.getenv("ANTHROPIC_MODEL", "claude-sonnet-4-20250514")
+
+# ─── HTTP Backend (Saviynt) ─────────────────────────────────────────────
+LLM_HTTP_BASE_URL = os.getenv("LLM_HTTP_BASE_URL", "")
+LLM_HTTP_AUTH_URL = os.getenv("LLM_HTTP_AUTH_URL", "")
+LLM_HTTP_USERNAME = os.getenv("LLM_HTTP_USERNAME", "")
+LLM_HTTP_PASSWORD = os.getenv("LLM_HTTP_PASSWORD", "")
+
 # ─── Bounded Autonomy Caps ──────────────────────────────────────────────
 REACT_MAX_ITERATIONS = int(os.getenv("REACT_MAX_ITERATIONS", "7"))
 REACT_MAX_PER_TOOL = int(os.getenv("REACT_MAX_PER_TOOL", "4"))
-REACT_WALL_CLOCK_SECONDS = int(os.getenv("REACT_WALL_CLOCK_SECONDS", "120"))
+REACT_WALL_CLOCK_SECONDS = int(os.getenv("REACT_WALL_CLOCK_SECONDS", "300"))
 
 # ─── Confidence Gate ────────────────────────────────────────────────────
 CONFIDENCE_THRESHOLD = float(os.getenv("CONFIDENCE_THRESHOLD", "0.70"))

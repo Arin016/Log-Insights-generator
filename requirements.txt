@@ -3,3 +3,4 @@ PyYAML==6.0.2
 elasticsearch==8.13.2
 python-dotenv==1.1.1
 structlog==25.4.0
+requests==2.32.5
