@@ -52,3 +52,24 @@ def test_isolated_semantic_rejects_overclaim(tmp_path):
     s,_,_=generated("positive")
     result,_=run_case(s,HarnessConfig(),tmp_path,intervention={"model_fault":"overclaim"})
     assert result["state"]=="HUMAN_REVIEW_REQUIRED"
+
+
+def test_repeated_query_without_new_evidence_terminates_before_budget_exhaustion():
+    s,_,_=generated("positive")
+    result=_execute([json.loads(e.raw_json) for e in s.events],s.scope.model_dump(),s.missing_sources,
+        HarnessConfig().model_dump(),{"model_fault":"repeat_query"},None,"test",lambda _:None)
+    assert result["state"]=="HUMAN_REVIEW_REQUIRED"
+    assert result["partial"]
+    assert result["investigation_termination"]["reason"]=="repeated_query_no_progress"
+    assert result["counts"]["model_calls"]==2
+
+
+def test_missing_source_no_progress_terminates_after_first_query():
+    s,_,_=generated("missing_source")
+    result=_execute([json.loads(e.raw_json) for e in s.events],s.scope.model_dump(),s.missing_sources,
+        HarnessConfig().model_dump(),{"model_fault":"repeat_query"},None,"test",lambda _:None)
+    assert result["state"]=="HUMAN_REVIEW_REQUIRED"
+    assert result["partial"]
+    assert result["investigation_termination"]["reason"]=="missing_source_no_progress"
+    assert result["investigation_termination"]["missing_sources"]
+    assert result["counts"]["model_calls"]==1

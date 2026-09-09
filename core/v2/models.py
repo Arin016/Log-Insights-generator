@@ -138,6 +138,8 @@ class ScriptedInvestigator:
 
     def respond(self,payload):
         if self.fault=="malformed": return "invalid JSON",None
+        if self.fault=="repeat_query":
+            return canonical_json({"action":"tool_call","query":{"template":"seed_events"},"claims":[]}),None
         capsule=Capsule.model_validate(payload["capsule"])
         rows=decode_capsule(capsule)
         if any(not all(k in row for k in ("event_type","actor","object_id")) for row in rows):

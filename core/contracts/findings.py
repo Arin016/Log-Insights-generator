@@ -1,6 +1,6 @@
 """Finding = the unit of analyzer output."""
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Literal
 from uuid import uuid4
 
@@ -47,7 +47,4 @@ class Finding(BaseModel):
     refined_from: str | None = None
     prompt_version: str = "v1"
     model_id: str = ""
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-
-    class Config:
-        json_encoders = {datetime: lambda v: v.isoformat()}
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

@@ -14,7 +14,7 @@ Layout under DATA_DIR:
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import uuid4
@@ -96,7 +96,7 @@ def log_llm_call(
         "call_id": call_id,
         "rak_id": rak_id,
         "purpose": purpose,
-        "timestamp": datetime.utcnow().isoformat(),
+        "timestamp": datetime.now(timezone.utc).isoformat(),
         "request": request,
         "response": response,
         "latency_ms": latency_ms,
@@ -139,7 +139,7 @@ def push_to_manual_review(
         "reason": reason,
         "pass1_finding": pass1_finding.model_dump(mode="json") if pass1_finding else None,
         "pass2_finding": pass2_finding.model_dump(mode="json") if pass2_finding else None,
-        "queued_at": datetime.utcnow().isoformat(),
+        "queued_at": datetime.now(timezone.utc).isoformat(),
     }
     path = MANUAL_REVIEW_DIR / f"{rak_id}__{finding_id}.json"
     _write_json(path, payload)

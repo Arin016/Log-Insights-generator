@@ -13,7 +13,7 @@ from __future__ import annotations
 
 import json
 import time
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 from config import (
@@ -168,7 +168,7 @@ def _findings_from_payload(
                     refined_from=None,
                     prompt_version=PROMPT_VERSIONS.get(use_case, "v1"),
                     model_id=KIRO_MODEL,
-                    created_at=datetime.utcnow(),
+                    created_at=datetime.now(timezone.utc),
                 )
             )
         except (KeyError, TypeError, ValueError) as e:

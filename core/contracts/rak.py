@@ -18,10 +18,6 @@ class RAKMetadata(BaseModel):
     rak_end: datetime
     total_event_count: int = 0
 
-    class Config:
-        json_encoders = {datetime: lambda v: v.isoformat()}
-
-
 class ReportMetadata(BaseModel):
     pipeline_version: str
     prompt_versions: dict[str, str]

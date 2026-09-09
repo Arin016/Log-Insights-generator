@@ -54,6 +54,7 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
     config=HarnessConfig.model_validate(config)
     meter=Meter(config.budgets,emit); machine=StateMachine(emit)
     claims=[]; decisions=[]; validations=[]; semantic_results=[]; capsules=[]; retrieved={}; observed={}
+    investigation_incomplete=False; investigation_termination=None
     try:
         machine.transition("INGESTED")
         snapshot=Snapshot([SourceRecord.model_validate(r) for r in records],Scope.model_validate(scope),missing_sources)
@@ -154,7 +155,7 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
             if config.adapter=="anthropic" and usage and (usage["stop_reason"]!="end_turn" or usage["provider_model"] not in {config.model,config.verifier_model}):
                 raise ValueError("Claude incomplete/refused response or unexpected model; usage recorded")
             return raw
-        observation=None; purpose="initial_calls"
+        observation=None; purpose="initial_calls"; investigator_queries=set()
         while True:
             payload={"capsule":current.model_dump(mode="json"),"hypothesis":hypothesis.model_dump(mode="json"),
                 "query_schema":Query.model_json_schema(),"claim_schema":proposal_schema(config.drill_down) if config.adapter in {"ollama","anthropic"} else ModelTurn.model_json_schema(),
@@ -178,7 +179,29 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
                 meter.charge("finalization_calls")
                 claims=[c.model_copy(update={"mandatory_checks":hypothesis.required_checks}) for c in turn.claims];break
             if not config.drill_down: raise PermissionError("single-pass harness cannot query tools")
-            observation=query(turn.query.model_dump(exclude_none=True),"investigator_queries")
+            request=turn.query.model_dump(exclude_none=True)
+            request_signature=digest(request)
+            before=set(observed)
+            observation=query(request,"investigator_queries")
+            new_evidence=sorted(set(observed)-before)
+            repeated=request_signature in investigator_queries
+            investigator_queries.add(request_signature)
+            # Missing sources can never be recovered through this snapshot-bound capability.
+            # Likewise, replaying an identical query that contributes no new evidence is not
+            # useful investigation. Terminate deterministically instead of spending the model
+            # budget until EXPIRED; coverage policy below routes the incomplete run to review.
+            if not new_evidence and (snapshot.missing_sources or repeated):
+                reason="missing_source_no_progress" if snapshot.missing_sources else "repeated_query_no_progress"
+                investigation_incomplete=True
+                investigation_termination={
+                    "reason":reason,
+                    "query_signature":request_signature,
+                    "missing_sources":list(snapshot.missing_sources),
+                    "new_evidence_count":0,
+                }
+                emit({"kind":"investigation_termination",**investigation_termination})
+                claims=[]
+                break
             current=capsule(observed.values());purpose="continuation_calls"
         # The candidate is now immutable; later deterministic evidence additions are separately traced.
         machine.transition("CLAIMS_PROPOSED")
@@ -195,7 +218,7 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
             validations.append(val)
         emit({"kind":"structural_verdicts","verdicts":[v.model_dump() for v in validations]})
         machine.transition("SEMANTIC_VERIFICATION")
-        incomplete=initial_incomplete or current.truncated
+        incomplete=initial_incomplete or current.truncated or investigation_incomplete
         enriched=[]; contradictions=[]
         for claim,val in zip(claims,validations):
             found=[]; query_partial=False
@@ -253,6 +276,7 @@ def _execute(records,scope,missing_sources,config,intervention,es,run_id,emit):
             "structural":[v.model_dump() for v in validations],"semantic":[v.model_dump() for v in semantic_results],
             "retrieved_event_ids":sorted(observed),"graph":graph.model_dump(mode="json") if config.graph else None,
             "partial":bool(incomplete or snapshot.missing_sources),"counts":dict(meter.counts),
+            "investigation_termination":investigation_termination,
             "tokens_measured":config.adapter in {"ollama","anthropic"},
             "cost_usd":meter.counts["cost_microusd"]/1e6 if config.adapter=="anthropic" else None}
     except (Exhausted,TimeoutError) as exc:

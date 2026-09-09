@@ -36,6 +36,3 @@ class LogEvent(BaseModel):
     # Raw + app-specific
     application: str = "sap"
     attributes: dict[str, Any] = Field(default_factory=dict)
-
-    class Config:
-        json_encoders = {datetime: lambda v: v.isoformat()}
